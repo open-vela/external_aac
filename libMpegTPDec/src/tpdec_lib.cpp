@@ -283,7 +283,7 @@ TRANSPORTDEC_ERROR transportDec_OutOfBandConfig(HANDLE_TRANSPORTDEC hTp,
 
   for (i = 0; i < 2; i++) {
     if (i > 0) {
-      FDKpushBack(hBs, (INT)length * 8 - (INT)FDKgetValidBits(hBs));
+      FDKpushBack(hBs, length * 8 - FDKgetValidBits(hBs));
       configMode = AC_CM_ALLOC_MEM;
     }
 
@@ -736,9 +736,9 @@ static TRANSPORTDEC_ERROR transportDec_AdjustEndOfAccessUnit(
             hTp->parser.latm.m_audioMuxLengthBytes > 0) {
           int loasOffset;
 
-          loasOffset = ((INT)hTp->parser.latm.m_audioMuxLengthBytes * 8 +
-                        (INT)FDKgetValidBits(hBs)) -
-                       (INT)hTp->globalFramePos;
+          loasOffset = (hTp->parser.latm.m_audioMuxLengthBytes * 8 +
+                        FDKgetValidBits(hBs)) -
+                       hTp->globalFramePos;
           if (loasOffset != 0) {
             FDKpushBiDirectional(hBs, loasOffset);
             /* For ELD and other payloads there is an unknown amount of padding,
@@ -871,7 +871,7 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(
   int fConfigFound = (pfConfigFound != NULL) ? *pfConfigFound : 0;
   int startPos;
 
-  startPos = (INT)FDKgetValidBits(hBs);
+  startPos = FDKgetValidBits(hBs);
 
   switch (hTp->transportFmt) {
     case TT_MP4_ADTS:
@@ -941,7 +941,7 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(
           fTraverseMoreFrames = 0;
         }
         syncLayerFrameBits = (hTp->parser.adts.bs.frame_length << 3) -
-                             (startPos - (INT)FDKgetValidBits(hBs)) -
+                             ((INT)startPos - (INT)FDKgetValidBits(hBs)) -
                              syncLength;
         if (syncLayerFrameBits <= 0) {
           err = TRANSPORTDEC_SYNC_ERROR;
@@ -952,11 +952,10 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(
       break;
     case TT_MP4_LOAS:
       if (hTp->numberOfRawDataBlocks <= 0) {
-        syncLayerFrameBits = (INT)FDKreadBits(hBs, 13);
+        syncLayerFrameBits = FDKreadBits(hBs, 13);
         hTp->parser.latm.m_audioMuxLengthBytes = syncLayerFrameBits;
         syncLayerFrameBits <<= 3;
       }
-      FDK_FALLTHROUGH;
     case TT_MP4_LATM_MCP1:
     case TT_MP4_LATM_MCP0:
       if (hTp->numberOfRawDataBlocks <= 0) {
@@ -975,7 +974,7 @@ static TRANSPORTDEC_ERROR transportDec_readHeader(
           hTp->numberOfRawDataBlocks =
               CLatmDemux_GetNrOfSubFrames(&hTp->parser.latm);
           if (hTp->transportFmt == TT_MP4_LOAS) {
-            syncLayerFrameBits -= startPos - (INT)FDKgetValidBits(hBs) - (13);
+            syncLayerFrameBits -= startPos - FDKgetValidBits(hBs) - (13);
           }
         }
       } else {
@@ -1152,12 +1151,6 @@ static TRANSPORTDEC_ERROR synchronization(HANDLE_TRANSPORTDEC hTp,
                                     &syncLayerFrameBits, &fConfigFound,
                                     &headerBits);
       if (TPDEC_IS_FATAL_ERROR(err)) {
-        /* Rewind - TPDEC_SYNCSKIP, in order to look for a synch one bit ahead
-         * next time. Ensure that the bit amount lands at a multiple of
-         * TPDEC_SYNCSKIP. */
-        FDKpushBiDirectional(
-            hBs, -headerBits + TPDEC_SYNCSKIP + (bitsAvail % TPDEC_SYNCSKIP));
-
         goto bail;
       }
     }
@@ -1338,9 +1331,9 @@ static TRANSPORTDEC_ERROR transportDec_readStream(HANDLE_TRANSPORTDEC hTp,
   INT bitDistance, bfDelta;
 
   /* Obtain distance to next synch word */
-  bitDistance = (INT)FDKgetValidBits(hBs);
+  bitDistance = FDKgetValidBits(hBs);
   error = synchronization(hTp, &headerBits);
-  bitDistance -= (INT)FDKgetValidBits(hBs);
+  bitDistance -= FDKgetValidBits(hBs);
 
   FDK_ASSERT(bitDistance >= 0);
 
@@ -1381,7 +1374,7 @@ static TRANSPORTDEC_ERROR transportDec_readStream(HANDLE_TRANSPORTDEC hTp,
         int num, denom;
 
         /* Obtain estimate of number of lost frames */
-        num = (INT)hTp->asc[0].m_samplingFrequency * (bfDelta + bitDistance) +
+        num = hTp->asc[0].m_samplingFrequency * (bfDelta + bitDistance) +
               hTp->remainder;
         denom = hTp->avgBitRate * hTp->asc[0].m_samplesPerFrame;
         if (num > 0) {

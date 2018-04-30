@@ -1622,7 +1622,7 @@ static DRC_ERROR _readUniDrcConfigExtension(
     HANDLE_FDK_BITSTREAM hBs, HANDLE_UNI_DRC_CONFIG hUniDrcConfig) {
   DRC_ERROR err = DE_OK;
   int k, bitSizeLen, extSizeBits, bitSize;
-  INT nBitsRemaining;
+  UINT nBitsRemaining;
   UNI_DRC_CONFIG_EXTENSION* pExt = &(hUniDrcConfig->uniDrcConfigExt);
 
   k = 0;
@@ -1634,14 +1634,13 @@ static DRC_ERROR _readUniDrcConfigExtension(
 
     bitSize = FDKreadBits(hBs, extSizeBits);
     pExt->extBitSize[k] = bitSize + 1;
-    nBitsRemaining = (INT)FDKgetValidBits(hBs);
+    nBitsRemaining = FDKgetValidBits(hBs);
 
     switch (pExt->uniDrcConfigExtType[k]) {
       case UNIDRCCONFEXT_V1:
         err = _readDrcExtensionV1(hBs, hUniDrcConfig);
         if (err) return err;
-        if (nBitsRemaining !=
-            ((INT)pExt->extBitSize[k] + (INT)FDKgetValidBits(hBs)))
+        if (nBitsRemaining != (pExt->extBitSize[k] + FDKgetValidBits(hBs)))
           return DE_NOT_OK;
         break;
       case UNIDRCCONFEXT_PARAM_DRC:
@@ -1941,7 +1940,7 @@ static DRC_ERROR _readLoudnessInfoSetExtension(
     HANDLE_FDK_BITSTREAM hBs, HANDLE_LOUDNESS_INFO_SET hLoudnessInfoSet) {
   DRC_ERROR err = DE_OK;
   int k, bitSizeLen, extSizeBits, bitSize;
-  INT nBitsRemaining;
+  UINT nBitsRemaining;
   LOUDNESS_INFO_SET_EXTENSION* pExt = &(hLoudnessInfoSet->loudnessInfoSetExt);
 
   k = 0;
@@ -1953,14 +1952,13 @@ static DRC_ERROR _readLoudnessInfoSetExtension(
 
     bitSize = FDKreadBits(hBs, extSizeBits);
     pExt->extBitSize[k] = bitSize + 1;
-    nBitsRemaining = (INT)FDKgetValidBits(hBs);
+    nBitsRemaining = FDKgetValidBits(hBs);
 
     switch (pExt->loudnessInfoSetExtType[k]) {
       case UNIDRCLOUDEXT_EQ:
         err = _readLoudnessInfoSetExtEq(hBs, hLoudnessInfoSet);
         if (err) return err;
-        if (nBitsRemaining !=
-            ((INT)pExt->extBitSize[k] + (INT)FDKgetValidBits(hBs)))
+        if (nBitsRemaining != (pExt->extBitSize[k] + FDKgetValidBits(hBs)))
           return DE_NOT_OK;
         break;
       /* add future extensions here */

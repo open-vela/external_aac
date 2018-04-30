@@ -225,18 +225,15 @@ void CChannelElement_Decode(
     /* apply intensity stereo */ /* modifies pAacDecoderChannelInfo[]->aSpecSfb
                                   */
     if (!(flags & (AC_USAC | AC_RSVD50 | AC_RSV603DA))) {
-      if ((pAacDecoderChannelInfo[L]->pDynData->RawDataInfo.CommonWindow ==
-           1) &&
-          (el_channels == 2)) {
-        CJointStereo_ApplyIS(
-            pAacDecoderChannelInfo,
-            GetScaleFactorBandOffsets(&pAacDecoderChannelInfo[L]->icsInfo,
-                                      pSamplingRateInfo),
-            GetWindowGroupLengthTable(&pAacDecoderChannelInfo[L]->icsInfo),
-            GetWindowGroups(&pAacDecoderChannelInfo[L]->icsInfo),
-            GetScaleFactorBandsTransmitted(
-                &pAacDecoderChannelInfo[L]->icsInfo));
-      }
+      CJointStereo_ApplyIS(
+          pAacDecoderChannelInfo,
+          GetScaleFactorBandOffsets(&pAacDecoderChannelInfo[L]->icsInfo,
+                                    pSamplingRateInfo),
+          GetWindowGroupLengthTable(&pAacDecoderChannelInfo[L]->icsInfo),
+          GetWindowGroups(&pAacDecoderChannelInfo[L]->icsInfo),
+          GetScaleFactorBandsTransmitted(&pAacDecoderChannelInfo[L]->icsInfo),
+          pAacDecoderChannelInfo[L]->pDynData->RawDataInfo.CommonWindow ? 1
+                                                                        : 0);
     }
   } /* maybe_stereo */
 
@@ -592,7 +589,6 @@ AAC_DECODER_ERROR CChannelElement_Read(
                                             line: ~599 */
         /* Note: The missing "break" is intentional here, since we need to call
          * CBlock_ReadScaleFactorData(). */
-        FDK_FALLTHROUGH;
 
       case scale_factor_data:
         if (flags & AC_ER_RVLC) {

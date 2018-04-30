@@ -291,13 +291,13 @@ SACDEC_ERROR SpatialDecParseSpecificConfigHeader(
   if (sacHeaderLen == 127) {
     sacHeaderLen += FDKreadBits(bitstream, 16);
   }
-  numFillBits = (INT)FDKgetValidBits(bitstream);
+  numFillBits = FDKgetValidBits(bitstream);
 
   err = SpatialDecParseSpecificConfig(bitstream, pSpatialSpecificConfig,
                                       sacHeaderLen, coreCodec);
 
   numFillBits -=
-      (INT)FDKgetValidBits(bitstream); /* the number of read bits (tmpBits) */
+      FDKgetValidBits(bitstream); /* the number of read bits (tmpBits) */
   numFillBits = (8 * sacHeaderLen) - numFillBits;
   if (numFillBits < 0) {
     /* Parsing went wrong */
@@ -324,8 +324,6 @@ SACDEC_ERROR SpatialDecParseMps212Config(
     AUDIO_OBJECT_TYPE coreCodec, INT stereoConfigIndex,
     INT coreSbrFrameLengthIndex) {
   int i;
-
-  FDKmemclear(pSpatialSpecificConfig, sizeof(SPATIAL_SPECIFIC_CONFIG));
 
   pSpatialSpecificConfig->stereoConfigIndex = stereoConfigIndex;
   pSpatialSpecificConfig->coreSbrFrameLengthIndex = coreSbrFrameLengthIndex;
@@ -449,8 +447,6 @@ SACDEC_ERROR SpatialDecParseSpecificConfig(
   int numHeaderBits;
   int cfgStartPos, bitsAvailable;
 
-  FDKmemclear(pSpatialSpecificConfig, sizeof(SPATIAL_SPECIFIC_CONFIG));
-
   cfgStartPos = FDKgetValidBits(bitstream);
   /* It might be that we do not know the SSC length beforehand. */
   if (sacHeaderLen == 0) {
@@ -570,7 +566,7 @@ SACDEC_ERROR SpatialDecParseSpecificConfig(
                                 with respect to the beginning of the syntactic
                                 element in which ByteAlign() occurs. */
 
-  numHeaderBits = cfgStartPos - (INT)FDKgetValidBits(bitstream);
+  numHeaderBits = cfgStartPos - FDKgetValidBits(bitstream);
   bitsAvailable -= numHeaderBits;
 
   pSpatialSpecificConfig->sacExtCnt = 0;
@@ -598,7 +594,7 @@ bail:
        bitbuffer is exactly at its end when leaving the function. */
     FDKpushBiDirectional(
         bitstream,
-        (sacHeaderLen * 8) - (cfgStartPos - (INT)FDKgetValidBits(bitstream)));
+        (sacHeaderLen * 8) - (cfgStartPos - FDKgetValidBits(bitstream)));
   }
 
   return err;

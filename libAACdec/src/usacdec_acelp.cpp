@@ -309,7 +309,7 @@ static FIXP_DBL calc_period_factor(FIXP_DBL exc[], FIXP_SGL gain_pit,
   ener_exc = (FIXP_DBL)0;
   for (int i = 0; i < L_SUBFR; i++) {
     ener_exc += fPow2Div2(exc[i]) >> s;
-    if (ener_exc >= FL2FXCONST_DBL(0.5f)) {
+    if (ener_exc > FL2FXCONST_DBL(0.5f)) {
       ener_exc >>= 1;
       s++;
     }
@@ -579,11 +579,11 @@ void Syn_filt(const FIXP_LPC a[], /* (i) : a[m] prediction coefficients Q12 */
     L_tmp = (FIXP_DBL)0;
 
     for (j = 0; j < M_LP_FILTER_ORDER; j++) {
-      L_tmp -= fMultDiv2(a[j], y[i - (j + 1)]) >> (LP_FILTER_SCALE - 1);
+      L_tmp -= fMultDiv2(a[j], y[i - (j + 1)]);
     }
 
-    L_tmp = scaleValue(L_tmp, a_exp + LP_FILTER_SCALE);
-    y[i] = fAddSaturate(L_tmp, x[i]);
+    L_tmp = scaleValue(L_tmp, a_exp + 1);
+    y[i] = L_tmp + x[i];
   }
 
   return;
@@ -631,10 +631,10 @@ void E_UTIL_residu(const FIXP_LPC *a, const INT a_exp, FIXP_DBL *x, FIXP_DBL *y,
     s = (FIXP_DBL)0;
 
     for (j = 0; j < M_LP_FILTER_ORDER; j++) {
-      s += fMultDiv2(a[j], x[i - j - 1]) >> (LP_FILTER_SCALE - 1);
+      s += fMultDiv2(a[j], x[i - j - 1]);
     }
 
-    s = scaleValue(s, a_exp + LP_FILTER_SCALE);
+    s = scaleValue(s, a_exp + 1);
     y[i] = fAddSaturate(s, x[i]);
   }
 
@@ -1116,8 +1116,7 @@ void CLpd_AcelpPrepareInternalMem(const FIXP_DBL *synth, UCHAR last_lpd_mode,
                                   const FIXP_LPC *A_new, const INT A_new_exp,
                                   const FIXP_LPC *A_old, const INT A_old_exp,
                                   CAcelpStaticMem *acelp_mem,
-                                  INT coreCoderFrameLength, INT clearOldExc,
-                                  UCHAR lpd_mode) {
+                                  INT coreCoderFrameLength, UCHAR lpd_mode) {
   int l_div =
       coreCoderFrameLength / NB_DIV; /* length of one ACELP/TCX20 frame */
   int l_div_partial;
@@ -1155,13 +1154,6 @@ void CLpd_AcelpPrepareInternalMem(const FIXP_DBL *synth, UCHAR last_lpd_mode,
             &syn[PIT_MAX_MAX + L_INTERPOL - M_LP_FILTER_ORDER],
             M_LP_FILTER_ORDER * sizeof(FIXP_DBL));
 
-  if (clearOldExc) {
-    FDKmemclear(old_exc_mem, (PIT_MAX_MAX + L_INTERPOL) * sizeof(FIXP_DBL));
-    C_ALLOC_SCRATCH_END(synth_buf, FIXP_DBL,
-                        PIT_MAX_MAX + L_INTERPOL + M_LP_FILTER_ORDER);
-    return;
-  }
-
   /* update past [PIT_MAX_MAX+L_INTERPOL] samples of exc memory */
   if (last_lpd_mode == 1) {        /* last frame was TCX20 */
     if (last_last_lpd_mode == 0) { /* ACELP -> TCX20 -> ACELP transition */
@@ -1178,6 +1170,7 @@ void CLpd_AcelpPrepareInternalMem(const FIXP_DBL *synth, UCHAR last_lpd_mode,
     int exc_A_new_length = (coreCoderFrameLength / 2 > PIT_MAX_MAX + L_INTERPOL)
                                ? PIT_MAX_MAX + L_INTERPOL
                                : coreCoderFrameLength / 2;
+
     int exc_A_old_length = PIT_MAX_MAX + L_INTERPOL - exc_A_new_length;
     E_UTIL_residu(A_old, A_old_exp, syn, old_exc_mem, exc_A_old_length);
     E_UTIL_residu(A_new, A_new_exp, &syn[exc_A_old_length],
