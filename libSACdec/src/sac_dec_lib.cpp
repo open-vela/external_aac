@@ -698,7 +698,6 @@ SACDEC_ERROR mpegSurroundDecoder_Config(
     INT coreSbrFrameLengthIndex, INT configBytes, const UCHAR configMode,
     UCHAR *configChanged) {
   SACDEC_ERROR err = MPS_OK;
-  SPATIAL_SPECIFIC_CONFIG spatialSpecificConfig;
 
   switch (coreCodec) {
     case AOT_DRM_USAC:
@@ -706,6 +705,7 @@ SACDEC_ERROR mpegSurroundDecoder_Config(
       if (configMode == AC_CM_DET_CFG_CHANGE) {
         /* In config detection mode write spatial specific config parameters
          * into temporarily allocated structure */
+        SPATIAL_SPECIFIC_CONFIG spatialSpecificConfig;
         err = SpatialDecParseMps212Config(
             hBs, &spatialSpecificConfig, samplingRate, coreCodec,
             stereoConfigIndex, coreSbrFrameLengthIndex);
@@ -718,16 +718,9 @@ SACDEC_ERROR mpegSurroundDecoder_Config(
       break;
     case AOT_ER_AAC_ELD:
     case AOT_ER_AAC_LD:
-      if (configMode == AC_CM_DET_CFG_CHANGE) {
-        /* In config detection mode write spatial specific config parameters
-         * into temporarily allocated structure */
-        err = SpatialDecParseSpecificConfig(hBs, &spatialSpecificConfig,
-                                            configBytes, coreCodec);
-      } else {
-        err = SpatialDecParseSpecificConfig(
-            hBs, &pMpegSurroundDecoder->spatialSpecificConfigBackup,
-            configBytes, coreCodec);
-      }
+      err = SpatialDecParseSpecificConfig(
+          hBs, &pMpegSurroundDecoder->spatialSpecificConfigBackup, configBytes,
+          coreCodec);
       break;
     default:
       err = MPS_UNSUPPORTED_FORMAT;
@@ -1087,7 +1080,6 @@ mpegSurroundDecoder_ConfigureQmfDomain(
 
   if (coreCodec == AOT_ER_AAC_ELD) {
     pGC->flags_requested |= QMF_FLAG_MPSLDFB;
-    pGC->flags_requested &= ~QMF_FLAG_CLDFB;
   }
 
   return err;
@@ -1233,7 +1225,7 @@ int mpegSurroundDecoder_Parse(CMpegSurroundDecoder *pMpegSurroundDecoder,
 
   FDK_ASSERT(pMpegSurroundDecoder->pSpatialDec);
 
-  mpsBsBits = (INT)FDKgetValidBits(hBs);
+  mpsBsBits = FDKgetValidBits(hBs);
 
   sscParse = &pMpegSurroundDecoder
                   ->spatialSpecificConfig[pMpegSurroundDecoder->bsFrameParse];
@@ -1309,14 +1301,14 @@ int mpegSurroundDecoder_Parse(CMpegSurroundDecoder *pMpegSurroundDecoder,
                   pMpegSurroundDecoder->spatialSpecificConfigBackup;
 
               /* Parse spatial specific config */
-              bitsRead = (INT)FDKgetValidBits(hMpsBsData);
+              bitsRead = FDKgetValidBits(hMpsBsData);
 
               err = SpatialDecParseSpecificConfigHeader(
                   hMpsBsData,
                   &pMpegSurroundDecoder->spatialSpecificConfigBackup, coreCodec,
                   pMpegSurroundDecoder->upmixType);
 
-              bitsRead = (bitsRead - (INT)FDKgetValidBits(hMpsBsData));
+              bitsRead = (bitsRead - FDKgetValidBits(hMpsBsData));
               parseResult = ((err == MPS_OK) ? bitsRead : -bitsRead);
 
               if (parseResult < 0) {
@@ -1350,7 +1342,6 @@ int mpegSurroundDecoder_Parse(CMpegSurroundDecoder *pMpegSurroundDecoder,
                 pMpegSurroundDecoder->mpegSurroundSscIsGlobalCfg = 0;
               }
             }
-              FDK_FALLTHROUGH;
             case MPEGS_ANCTYPE_FRAME:
 
               if (pMpegSurroundDecoder
@@ -1431,7 +1422,7 @@ int mpegSurroundDecoder_Parse(CMpegSurroundDecoder *pMpegSurroundDecoder,
 
 bail:
 
-  *pMpsDataBits -= (mpsBsBits - (INT)FDKgetValidBits(hBs));
+  *pMpsDataBits -= (mpsBsBits - FDKgetValidBits(hBs));
 
   return err;
 }

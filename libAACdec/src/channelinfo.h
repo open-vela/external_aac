@@ -359,7 +359,7 @@ typedef struct {
   shouldBeUnion {
     struct {
       FIXP_DBL fac_data0[LFAC];
-      SCHAR fac_data_e[4];
+      UCHAR fac_data_e[4];
       FIXP_DBL
       *fac_data[4]; /* Pointers to unused parts of pSpectralCoefficient */
 
@@ -478,13 +478,15 @@ void CJointStereo_ApplyMS(
   \param pWindowGroupLength pointer to window group length array.
   \param windowGroups number of window groups.
   \param scaleFactorBandsTransmitted number of transmitted scalefactor bands.
+  \param CommonWindow common window bit.
   \return  none
 */
 void CJointStereo_ApplyIS(CAacDecoderChannelInfo *pAacDecoderChannelInfo[2],
                           const short *pScaleFactorBandOffsets,
                           const UCHAR *pWindowGroupLength,
                           const int windowGroups,
-                          const int scaleFactorBandsTransmitted);
+                          const int scaleFactorBandsTransmitted,
+                          const UINT CommonWindow);
 
 /* aacdec_pns.cpp */
 int CPns_IsPnsUsed(const CPnsData *pPnsData, const int group, const int band);

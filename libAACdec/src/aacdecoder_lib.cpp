@@ -368,23 +368,6 @@ static INT aacDecoder_CtrlCFGChangeCallback(
   return errTp;
 }
 
-static INT aacDecoder_SbrCallback(
-    void *handle, HANDLE_FDK_BITSTREAM hBs, const INT sampleRateIn,
-    const INT sampleRateOut, const INT samplesPerFrame,
-    const AUDIO_OBJECT_TYPE coreCodec, const MP4_ELEMENT_ID elementID,
-    const INT elementIndex, const UCHAR harmonicSBR,
-    const UCHAR stereoConfigIndex, const UCHAR configMode, UCHAR *configChanged,
-    const INT downscaleFactor) {
-  HANDLE_SBRDECODER self = (HANDLE_SBRDECODER)handle;
-
-  INT errTp = sbrDecoder_Header(self, hBs, sampleRateIn, sampleRateOut,
-                                samplesPerFrame, coreCodec, elementID,
-                                elementIndex, harmonicSBR, stereoConfigIndex,
-                                configMode, configChanged, downscaleFactor);
-
-  return errTp;
-}
-
 static INT aacDecoder_SscCallback(void *handle, HANDLE_FDK_BITSTREAM hBs,
                                   const AUDIO_OBJECT_TYPE coreCodec,
                                   const INT samplingRate,
@@ -413,8 +396,7 @@ static INT aacDecoder_SscCallback(void *handle, HANDLE_FDK_BITSTREAM hBs,
       /* MPS found but invalid or not decodable by this instance            */
       hAacDecoder->mpsEnableCurr = 0;
       hAacDecoder->mpsApplicable = 0;
-      if ((coreCodec == AOT_USAC) || (coreCodec == AOT_DRM_USAC) ||
-          IS_LOWDELAY(coreCodec)) {
+      if ((coreCodec == AOT_USAC) || IS_LOWDELAY(coreCodec)) {
         errTp = TRANSPORTDEC_PARSE_ERROR;
       } else {
         errTp = TRANSPORTDEC_OK;
@@ -634,7 +616,6 @@ static AAC_DECODER_ERROR setConcealMethod(
     switch (err) {
       case PCMDMX_INVALID_HANDLE:
         errorStatus = AAC_DEC_INVALID_HANDLE;
-        break;
       case PCMDMX_OK:
         break;
       default:
@@ -977,7 +958,7 @@ LINKSPEC_CPP HANDLE_AACDECODER aacDecoder_Open(TRANSPORT_TYPE transportFmt,
     goto bail;
   }
   aacDec->qmfModeUser = NOT_DEFINED;
-  transportDec_RegisterSbrCallback(aacDec->hInput, aacDecoder_SbrCallback,
+  transportDec_RegisterSbrCallback(aacDec->hInput, (cbSbr_t)sbrDecoder_Header,
                                    (void *)aacDec->hSbrDecoder);
 
   if (mpegSurroundDecoder_Open(
@@ -1100,7 +1081,7 @@ static void aacDecoder_UpdateBitStreamCounters(CStreamInfo *pSi,
 
   /* bit/byte counters */
   {
-    INT nBytes;
+    int nBytes;
 
     nBytes = nBits >> 3;
     pSi->numTotalBytes += nBytes;
@@ -1673,14 +1654,14 @@ aacDecoder_DecodeFrame(HANDLE_AACDECODER self, INT_PCM *pTimeData_extern,
                       self->streamInfo.frameSize;
 
           for (ch = 0; ch < self->streamInfo.numChannels; ch++) {
-            UCHAR mapValue = FDK_chMapDescr_getMapValue(
+            int mapValue = FDK_chMapDescr_getMapValue(
                 &self->mapDescr, (UCHAR)ch, self->chMapIndex);
-            if (mapValue < (8)) reverseInChannelMap[mapValue] = ch;
+            reverseInChannelMap[mapValue] = ch;
           }
           for (ch = 0; ch < (int)numDrcOutChannels; ch++) {
-            UCHAR mapValue = FDK_chMapDescr_getMapValue(
+            int mapValue = FDK_chMapDescr_getMapValue(
                 &self->mapDescr, (UCHAR)ch, numDrcOutChannels);
-            if (mapValue < (8)) reverseOutChannelMap[mapValue] = ch;
+            reverseOutChannelMap[mapValue] = ch;
           }
 
           /* The output of SBR and MPS is interleaved. Deinterleaving may be
@@ -1883,7 +1864,7 @@ aacDecoder_DecodeFrame(HANDLE_AACDECODER self, INT_PCM *pTimeData_extern,
 
     } /* USAC DASH IPF flushing possible end */
     if (accessUnit < numPrerollAU) {
-      FDKpushBack(hBsAu, auStartAnchor - (INT)FDKgetValidBits(hBsAu));
+      FDKpushBack(hBsAu, auStartAnchor - FDKgetValidBits(hBsAu));
     } else {
       if ((self->buildUpStatus == AACDEC_RSV60_BUILD_UP_ON) ||
           (self->buildUpStatus == AACDEC_RSV60_BUILD_UP_ON_IN_BAND) ||

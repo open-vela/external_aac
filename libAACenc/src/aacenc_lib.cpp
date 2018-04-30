@@ -907,7 +907,6 @@ static AACENC_ERROR FDKaacEnc_AdjustEncSettings(HANDLE_AACENCODER hAacEncoder,
     case AOT_MP2_AAC_LC:
     case AOT_MP2_SBR:
       hAacConfig->usePns = 0;
-      FDK_FALLTHROUGH;
     case AOT_AAC_LC:
     case AOT_SBR:
     case AOT_PS:
@@ -1734,10 +1733,9 @@ AACENC_ERROR aacEncEncode(const HANDLE_AACENCODER hAacEncoder,
   }
 
   /* check if buffer descriptors are filled out properly. */
-  if ((inargs == NULL) || (outargs == NULL) ||
-      ((AACENC_OK != validateBufDesc(inBufDesc)) &&
-       (inargs->numInSamples > 0)) ||
-      (AACENC_OK != validateBufDesc(outBufDesc))) {
+  if ((AACENC_OK != validateBufDesc(inBufDesc)) ||
+      (AACENC_OK != validateBufDesc(outBufDesc)) || (inargs == NULL) ||
+      (outargs == NULL)) {
     err = AACENC_UNSUPPORTED_PARAMETER;
     goto bail;
   }
@@ -2092,14 +2090,12 @@ AACENC_ERROR aacEncoder_SetParam(const HANDLE_AACENCODER hAacEncoder,
               err = AACENC_INVALID_CONFIG;
               goto bail;
             }
-            FDK_FALLTHROUGH;
           case AOT_SBR:
           case AOT_MP2_SBR:
             if (!(hAacEncoder->encoder_modis & (ENC_MODE_FLAG_SBR))) {
               err = AACENC_INVALID_CONFIG;
               goto bail;
             }
-            FDK_FALLTHROUGH;
           case AOT_AAC_LC:
           case AOT_MP2_AAC_LC:
           case AOT_ER_AAC_LD:

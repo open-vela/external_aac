@@ -1177,7 +1177,8 @@ void CJointStereo_ApplyIS(CAacDecoderChannelInfo *pAacDecoderChannelInfo[2],
                           const SHORT *pScaleFactorBandOffsets,
                           const UCHAR *pWindowGroupLength,
                           const int windowGroups,
-                          const int scaleFactorBandsTransmitted) {
+                          const int scaleFactorBandsTransmitted,
+                          const UINT CommonWindow) {
   CJointStereoData *pJointStereoData =
       &pAacDecoderChannelInfo[L]->pComData->jointStereoData;
 
@@ -1227,7 +1228,7 @@ void CJointStereo_ApplyIS(CAacDecoderChannelInfo *pAacDecoderChannelInfo[2],
 
           rightScale[band] = leftScale[band] + msb + 1;
 
-          if (pJointStereoData->MsUsed[band] & groupMask) {
+          if (CommonWindow && (pJointStereoData->MsUsed[band] & groupMask)) {
             if (CodeBook[band] == INTENSITY_HCB) /* _NOT_ in-phase */
             {
               scale = -scale;

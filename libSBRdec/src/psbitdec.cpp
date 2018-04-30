@@ -311,8 +311,6 @@ int DecodePs(struct PS_DEC *h_ps_d,  /*!< PS handle */
     pBsData->noEnv = 1;
 
     if (pBsData->bEnableIid) {
-      pBsData->bFineIidQ = h_ps_d->specificTo.mpeg.bPrevFrameFineIidQ;
-      pBsData->freqResIid = h_ps_d->specificTo.mpeg.prevFreqResIid;
       for (gr = 0; gr < NO_HI_RES_IID_BINS; gr++) {
         pBsData->aaIidIndex[pBsData->noEnv - 1][gr] =
             h_ps_d->specificTo.mpeg.aIidPrevFrameIndex[gr];
@@ -324,7 +322,6 @@ int DecodePs(struct PS_DEC *h_ps_d,  /*!< PS handle */
     }
 
     if (pBsData->bEnableIcc) {
-      pBsData->freqResIcc = h_ps_d->specificTo.mpeg.prevFreqResIcc;
       for (gr = 0; gr < NO_HI_RES_ICC_BINS; gr++) {
         pBsData->aaIccIndex[pBsData->noEnv - 1][gr] =
             h_ps_d->specificTo.mpeg.aIccPrevFrameIndex[gr];
@@ -335,15 +332,6 @@ int DecodePs(struct PS_DEC *h_ps_d,  /*!< PS handle */
       }
     }
   }
-
-  /* Update previous frame Iid quantization */
-  h_ps_d->specificTo.mpeg.bPrevFrameFineIidQ = pBsData->bFineIidQ;
-
-  /* Update previous frequency resolution for IID */
-  h_ps_d->specificTo.mpeg.prevFreqResIid = pBsData->freqResIid;
-
-  /* Update previous frequency resolution for ICC */
-  h_ps_d->specificTo.mpeg.prevFreqResIcc = pBsData->freqResIcc;
 
   /* Update previous frame index buffers */
   for (gr = 0; gr < NO_HI_RES_IID_BINS; gr++) {
@@ -508,7 +496,7 @@ unsigned int ReadPsData(
     /* no useful PS data could be read from bitstream */
     h_ps_d->bPsDataAvail[h_ps_d->bsReadSlot] = ppt_none;
     /* discard all remaining bits */
-    nBitsLeft -= startbits - (INT)FDKgetValidBits(hBitBuf);
+    nBitsLeft -= startbits - FDKgetValidBits(hBitBuf);
     while (nBitsLeft > 0) {
       int i = nBitsLeft;
       if (i > 8) {
@@ -517,7 +505,7 @@ unsigned int ReadPsData(
       FDKreadBits(hBitBuf, i);
       nBitsLeft -= i;
     }
-    return (UINT)(startbits - (INT)FDKgetValidBits(hBitBuf));
+    return (startbits - FDKgetValidBits(hBitBuf));
   }
 
   if (pBsData->modeIid > 2) {

@@ -139,7 +139,7 @@ static const MP4_ELEMENT_ID channel_configuration_13[] = {
     ID_SCE, ID_CPE, ID_CPE, ID_CPE, ID_CPE, ID_SCE, ID_LFE, ID_LFE, ID_SCE,
     ID_CPE, ID_CPE, ID_SCE, ID_CPE, ID_SCE, ID_SCE, ID_CPE, ID_NONE};
 static const MP4_ELEMENT_ID channel_configuration_14[] = {
-    ID_SCE, ID_CPE, ID_CPE, ID_LFE, ID_CPE, ID_NONE};
+    ID_SCE, ID_CPE, ID_CPE, ID_LAST, ID_CPE, ID_NONE};
 
 static const MP4_ELEMENT_ID *channel_configuration_array[] = {
     channel_configuration_0,  channel_configuration_1,
@@ -257,11 +257,11 @@ static int CProgramConfig_ReadHeightExt(CProgramConfig *pPce,
     }
   } else {
     /* No valid extension data found -> restore the initial bitbuffer state */
-    FDKpushBack(bs, (INT)startAnchor - (INT)FDKgetValidBits(bs));
+    FDKpushBack(bs, startAnchor - FDKgetValidBits(bs));
   }
 
   /* Always report the bytes read. */
-  *bytesAvailable -= ((INT)startAnchor - (INT)FDKgetValidBits(bs)) >> 3;
+  *bytesAvailable -= (startAnchor - FDKgetValidBits(bs)) >> 3;
 
   return (err);
 }
@@ -467,7 +467,6 @@ void CProgramConfig_GetDefault(CProgramConfig *pPce, const UINT channelConfig) {
       pPce->BackElementIsCpe[1] = 1;
       pPce->NumChannels += 1;
       pPce->NumEffectiveChannels += 1;
-      FDK_FALLTHROUGH;
     case 11: /* 3/0/3.1ch */
       pPce->NumFrontChannelElements += 2;
       pPce->FrontElementIsCpe[0] = 0;
@@ -483,30 +482,25 @@ void CProgramConfig_GetDefault(CProgramConfig *pPce, const UINT channelConfig) {
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     case 14:                               /* 2/0/0-3/0/2-0.1ch front height */
       pPce->FrontElementHeightInfo[2] = 1; /* Top speaker */
-      FDK_FALLTHROUGH;
-    case 7: /* 5/0/2.1ch front */
+    case 7:                                /* 5/0/2.1ch front */
       pPce->NumFrontChannelElements += 1;
       pPce->FrontElementIsCpe[2] = 1;
       pPce->NumChannels += 2;
       pPce->NumEffectiveChannels += 2;
-      FDK_FALLTHROUGH;
     case 6: /* 3/0/2.1ch */
       pPce->NumLfeChannelElements += 1;
       pPce->NumChannels += 1;
-      FDK_FALLTHROUGH;
     case 5: /* 3/0/2.0ch */
     case 4: /* 3/0/1.0ch */
       pPce->NumBackChannelElements += 1;
       pPce->BackElementIsCpe[0] = (channelConfig > 4) ? 1 : 0;
       pPce->NumChannels += (channelConfig > 4) ? 2 : 1;
       pPce->NumEffectiveChannels += (channelConfig > 4) ? 2 : 1;
-      FDK_FALLTHROUGH;
     case 3: /* 3/0/0.0ch */
       pPce->NumFrontChannelElements += 1;
       pPce->FrontElementIsCpe[1] = 1;
       pPce->NumChannels += 2;
       pPce->NumEffectiveChannels += 2;
-      FDK_FALLTHROUGH;
     case 1: /* 1/0/0.0ch */
       pPce->NumFrontChannelElements += 1;
       pPce->FrontElementIsCpe[0] = 0;
@@ -719,7 +713,6 @@ int CProgramConfig_LookupElement(CProgramConfig *pPce, UINT channelConfig,
       switch (elType) {
         case ID_CPE:
           isCpe = 1;
-          FDK_FALLTHROUGH;
         case ID_SCE:
           /* search in front channels */
           for (i = 0; i < pPce->NumFrontChannelElements; i++) {
@@ -1300,11 +1293,7 @@ static INT ld_sbr_header(CSAudioSpecificConfig *asc, const INT dsFactor,
   /* read elements of the passed channel_configuration until there is ID_NONE */
   while ((element = channel_configuration_array[channelConfiguration][j]) !=
          ID_NONE) {
-    /* Setup LFE element for upsampling too. This is essential especially for
-     * channel configs where the LFE element is not at the last position for
-     * example in channel config 13 or 14. It leads to memory leaks if the setup
-     * of the LFE element would be done later in the core. */
-    if (element == ID_SCE || element == ID_CPE || element == ID_LFE) {
+    if (element == ID_SCE || element == ID_CPE) {
       error |= cb->cbSbr(
           cb->cbSbrData, hBs, asc->m_samplingFrequency / dsFactor,
           asc->m_extensionSamplingFrequency / dsFactor,
@@ -1423,7 +1412,7 @@ static TRANSPORTDEC_ERROR EldSpecificConfig_Parse(CSAudioSpecificConfig *asc,
           break;
         }
 
-        FDK_FALLTHROUGH;
+      /* fall-through */
       default:
         for (cnt = 0; cnt < eldExtLen; cnt++) {
           FDKreadBits(hBs, 8);
@@ -1629,7 +1618,7 @@ static TRANSPORTDEC_ERROR configExtension(CSUsacConfig *usc,
     usacConfigExtLength = (int)escapedValue(hBs, 4, 8, 16);
 
     /* Start bit position of config extension */
-    nbits = (INT)FDKgetValidBits(hBs);
+    nbits = FDKgetValidBits(hBs);
 
     /* Return an error in case the bitbuffer fill level is too low. */
     if (nbits < usacConfigExtLength * 8) {
@@ -1661,7 +1650,7 @@ static TRANSPORTDEC_ERROR configExtension(CSUsacConfig *usc,
 
     /* Skip remaining bits. If too many bits were parsed, assume error. */
     usacConfigExtLength =
-        8 * usacConfigExtLength - (nbits - (INT)FDKgetValidBits(hBs));
+        8 * usacConfigExtLength - (nbits - FDKgetValidBits(hBs));
     if (usacConfigExtLength < 0) {
       return TRANSPORTDEC_PARSE_ERROR;
     }
@@ -2033,7 +2022,6 @@ static TRANSPORTDEC_ERROR AudioSpecificConfig_ExtensionParse(
         break;
       case ASCEXT_MPS: /* 0x76a */
         if (self->m_extensionAudioObjectType == AOT_MPEGS) break;
-        FDK_FALLTHROUGH;
       case ASCEXT_LDMPS: /* 0x7cc */
         if ((ascExtId == ASCEXT_LDMPS) &&
             (self->m_extensionAudioObjectType == AOT_LD_MPEGS))
@@ -2114,9 +2102,7 @@ TRANSPORTDEC_ERROR AudioSpecificConfig_Parse(
     self->m_aot = getAOT(bs);
     self->m_samplingFrequency =
         getSampleRate(bs, &self->m_samplingFrequencyIndex, 4);
-    if (self->m_samplingFrequency <= 0 ||
-        (self->m_samplingFrequency > 96000 && self->m_aot != 39) ||
-        self->m_samplingFrequency > 4 * 96000) {
+    if (self->m_samplingFrequency <= 0) {
       return TRANSPORTDEC_PARSE_ERROR;
     }
 
@@ -2502,7 +2488,7 @@ TRANSPORTDEC_ERROR DrmRawSdcAudioConfig_Parse(
 
     switch (audioCoding) {
       case 0: /* AAC */
-        if ((coderField >> 2) && (audioMode != 1)) {
+        if (coderField >> 2) {
           self->m_aot = AOT_DRM_SURROUND; /* Set pseudo AOT for Drm Surround */
         } else {
           self->m_aot = AOT_DRM_AAC; /* Set pseudo AOT for Drm AAC */
@@ -2510,7 +2496,6 @@ TRANSPORTDEC_ERROR DrmRawSdcAudioConfig_Parse(
         switch (audioMode) {
           case 1: /* parametric stereo */
             self->m_psPresentFlag = 1;
-            FDK_FALLTHROUGH;
           case 0: /* mono */
             self->m_channelConfiguration = 1;
             break;
