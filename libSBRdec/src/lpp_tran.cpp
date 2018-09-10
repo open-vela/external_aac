@@ -97,7 +97,7 @@ amm-info@iis.fraunhofer.de
 */
 
 #ifdef __ANDROID__
-#include "log/log.h"
+#include <cutils/log.h>
 #endif
 
 #include "lpp_tran.h"
