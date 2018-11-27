@@ -168,14 +168,13 @@ static void rvlcInit(CErRvlcInfo *pRvlc,
   /* set base bitstream ptr to the RVL-coded part (start of RVLC data (ESC 2))
    */
   FDKsyncCache(bs);
-  pRvlc->bsAnchor = (INT)FDKgetValidBits(bs);
 
-  pRvlc->bitstreamIndexRvlFwd =
-      0; /* first bit within RVL coded block as start address for  forward
-            decoding */
-  pRvlc->bitstreamIndexRvlBwd =
-      pRvlc->length_of_rvlc_sf - 1; /* last bit within RVL coded block as start
-                                       address for backward decoding */
+  pRvlc->bitstreamIndexRvlFwd = FDKgetBitCnt(
+      bs); /* first bit within RVL coded block as start address for  forward
+              decoding */
+  pRvlc->bitstreamIndexRvlBwd = FDKgetBitCnt(bs) + pRvlc->length_of_rvlc_sf -
+                                1; /* last bit within RVL coded block as start
+                                      address for backward decoding */
 
   /* skip RVLC-bitstream-part -- pointing now to escapes (if present) or to TNS
    * data (if present) */
@@ -184,7 +183,7 @@ static void rvlcInit(CErRvlcInfo *pRvlc,
   if (pRvlc->sf_escapes_present != 0) {
     /* locate internal bitstream ptr at escapes (which is the second part) */
     FDKsyncCache(bs);
-    pRvlc->bitstreamIndexEsc = pRvlc->bsAnchor - (INT)FDKgetValidBits(bs);
+    pRvlc->bitstreamIndexEsc = FDKgetBitCnt(bs);
 
     /* skip escapeRVLC-bitstream-part -- pointing to TNS data (if present)   to
      * make decoder continue */
@@ -260,9 +259,8 @@ static SCHAR rvlcDecodeEscapeWord(CErRvlcInfo *pRvlc, HANDLE_FDK_BITSTREAM bs) {
   treeNode = *pEscTree; /* init at starting node */
 
   for (i = MAX_LEN_RVLC_ESCAPE_WORD - 1; i >= 0; i--) {
-    carryBit =
-        rvlcReadBitFromBitstream(bs, /* get next bit */
-                                 pRvlc->bsAnchor, pBitstreamIndexEsc, FWD);
+    carryBit = rvlcReadBitFromBitstream(bs, /* get next bit */
+                                        pBitstreamIndexEsc, FWD);
 
     CarryBitToBranchValue(carryBit, /* huffman decoding, do a single step in
                                        huffman decoding tree */
@@ -372,9 +370,8 @@ SCHAR decodeRVLCodeword(HANDLE_FDK_BITSTREAM bs, CErRvlcInfo *pRvlc) {
   UINT treeNode = *pRvlCodeTree;
 
   for (i = MAX_LEN_RVLC_CODE_WORD - 1; i >= 0; i--) {
-    carryBit =
-        rvlcReadBitFromBitstream(bs, /* get next bit */
-                                 pRvlc->bsAnchor, pBitstrIndxRvl, direction);
+    carryBit = rvlcReadBitFromBitstream(bs, /* get next bit */
+                                        pBitstrIndxRvl, direction);
 
     CarryBitToBranchValue(carryBit, /* huffman decoding, do a single step in
                                        huffman decoding tree */
@@ -1143,7 +1140,7 @@ void CRvlc_Decode(CAacDecoderChannelInfo *pAacDecoderChannelInfo,
   rvlcInit(pRvlc, pAacDecoderChannelInfo, bs);
 
   /* save bitstream position */
-  saveBitCnt = (INT)FDKgetValidBits(bs);
+  saveBitCnt = FDKgetBitCnt(bs);
 
   if (pRvlc->sf_escapes_present)
     rvlcDecodeEscapes(
@@ -1158,7 +1155,7 @@ void CRvlc_Decode(CAacDecoderChannelInfo *pAacDecoderChannelInfo,
   pAacDecoderChannelInfo->data.aac.PnsData.PnsActive = pRvlc->noise_used;
 
   /* restore bitstream position */
-  bitCntOffst = (INT)FDKgetValidBits(bs) - saveBitCnt;
+  bitCntOffst = saveBitCnt - FDKgetBitCnt(bs);
   if (bitCntOffst) {
     FDKpushBiDirectional(bs, bitCntOffst);
   }
