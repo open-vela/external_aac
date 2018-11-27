@@ -350,7 +350,7 @@ typedef struct {
   SHORT lengthOfReorderedSpectralData;
   SHORT numSection;
   SHORT *pNumLineInSect;
-  INT bitstreamAnchor;
+  INT bitstreamIndex;
   SCHAR lengthOfLongestCodeword;
   UCHAR *pCodebook;
 } HCR_INPUT_OUTPUT;

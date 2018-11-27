@@ -1221,7 +1221,8 @@ AAC_DECODER_ERROR CLpdChannelStream_Read(
       (INT)(samplingRate * PIT_MIN_12k8 + (FSCALE_DENOM / 2)) / FSCALE_DENOM -
       (INT)PIT_MIN_12k8;
 
-  if ((samplingRate < 6000) || (samplingRate > 24000)) {
+  if (pSamplingRateInfo->samplingRate >
+      FAC_FSCALE_MAX /* maximum allowed core sampling frequency */) {
     error = AAC_DEC_PARSE_ERROR;
     goto bail;
   }
