@@ -1232,7 +1232,7 @@ int mpegSurroundDecoder_Parse(CMpegSurroundDecoder *pMpegSurroundDecoder,
 
   FDK_ASSERT(pMpegSurroundDecoder->pSpatialDec);
 
-  mpsBsBits = (INT)FDKgetValidBits(hBs);
+  mpsBsBits = FDKgetValidBits(hBs);
 
   sscParse = &pMpegSurroundDecoder
                   ->spatialSpecificConfig[pMpegSurroundDecoder->bsFrameParse];
@@ -1308,14 +1308,14 @@ int mpegSurroundDecoder_Parse(CMpegSurroundDecoder *pMpegSurroundDecoder,
                   pMpegSurroundDecoder->spatialSpecificConfigBackup;
 
               /* Parse spatial specific config */
-              bitsRead = (INT)FDKgetValidBits(hMpsBsData);
+              bitsRead = FDKgetValidBits(hMpsBsData);
 
               err = SpatialDecParseSpecificConfigHeader(
                   hMpsBsData,
                   &pMpegSurroundDecoder->spatialSpecificConfigBackup, coreCodec,
                   pMpegSurroundDecoder->upmixType);
 
-              bitsRead = (bitsRead - (INT)FDKgetValidBits(hMpsBsData));
+              bitsRead = (bitsRead - FDKgetValidBits(hMpsBsData));
               parseResult = ((err == MPS_OK) ? bitsRead : -bitsRead);
 
               if (parseResult < 0) {
@@ -1429,7 +1429,7 @@ int mpegSurroundDecoder_Parse(CMpegSurroundDecoder *pMpegSurroundDecoder,
 
 bail:
 
-  *pMpsDataBits -= (mpsBsBits - (INT)FDKgetValidBits(hBs));
+  *pMpsDataBits -= (mpsBsBits - FDKgetValidBits(hBs));
 
   return err;
 }
