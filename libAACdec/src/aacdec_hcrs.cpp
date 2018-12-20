@@ -367,10 +367,7 @@ static UINT InitSegmentBitfield(UINT *pNumSegment,
   UINT tempWord;
   USHORT numValidSegment;
 
-  *pNumWordForBitfield =
-      (*pNumSegment == 0)
-          ? 0
-          : ((*pNumSegment - 1) >> THIRTYTWO_LOG_DIV_TWO_LOG) + 1;
+  *pNumWordForBitfield = ((*pNumSegment - 1) >> THIRTYTWO_LOG_DIV_TWO_LOG) + 1;
 
   /* loop over all words, which are completely used or only partial */
   /* bit in pSegmentBitfield is zero if segment is empty; bit in
