@@ -418,7 +418,6 @@ void CLpd_AdaptLowFreqDeemph(FIXP_DBL x[], int lg, FIXP_DBL alfd_gains[],
     FIXP_DBL tmp_pow2[32];
 
     s = s * 2 + ALFDPOW2_SCALE;
-    s = fMin(31, s);
 
     k = 8;
     i_max = lg / 4; /* ALFD range = 1600Hz (lg = 6400Hz) */
