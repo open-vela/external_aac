@@ -1733,10 +1733,9 @@ AACENC_ERROR aacEncEncode(const HANDLE_AACENCODER hAacEncoder,
   }
 
   /* check if buffer descriptors are filled out properly. */
-  if ((inargs == NULL) || (outargs == NULL) ||
-      ((AACENC_OK != validateBufDesc(inBufDesc)) &&
-       (inargs->numInSamples > 0)) ||
-      (AACENC_OK != validateBufDesc(outBufDesc))) {
+  if ((AACENC_OK != validateBufDesc(inBufDesc)) ||
+      (AACENC_OK != validateBufDesc(outBufDesc)) || (inargs == NULL) ||
+      (outargs == NULL)) {
     err = AACENC_UNSUPPORTED_PARAMETER;
     goto bail;
   }
