@@ -609,16 +609,13 @@ static inline ULONG get_pk_v2(ULONG s) {
   return (j & 0x3F);
 }
 
-static ARITH_CODING_ERROR decode2(HANDLE_FDK_BITSTREAM bbuf,
-                                  UCHAR *RESTRICT c_prev,
-                                  FIXP_DBL *RESTRICT pSpectralCoefficient,
-                                  INT n, INT nt) {
+static void decode2(HANDLE_FDK_BITSTREAM bbuf, UCHAR *RESTRICT c_prev,
+                    FIXP_DBL *RESTRICT pSpectralCoefficient, INT n, INT nt) {
   Tastat as;
   int i, l, r;
   INT lev, esc_nb, pki;
   USHORT state_inc;
   UINT s;
-  ARITH_CODING_ERROR ErrorStatus = ARITH_CODER_OK;
 
   int c_3 = 0; /* context of current frame 3 time steps ago */
   int c_2 = 0; /* context of current frame 2 time steps ago */
@@ -657,8 +654,6 @@ static ARITH_CODING_ERROR decode2(HANDLE_FDK_BITSTREAM bbuf,
       }
 
       lev++;
-
-      if (lev > 23) return ARITH_CODER_ERROR;
 
       if (esc_nb < 7) {
         esc_nb++;
@@ -726,8 +721,6 @@ static ARITH_CODING_ERROR decode2(HANDLE_FDK_BITSTREAM bbuf,
   }
 
   FDKmemset(&c_prev[i], 1, sizeof(c_prev[0]) * (nt - i));
-
-  return ErrorStatus;
 }
 
 CArcoData *CArco_Create(void) { return GetArcoData(); }
@@ -770,8 +763,7 @@ ARITH_CODING_ERROR CArco_DecodeArithData(CArcoData *pArcoData,
   pArcoData->m_numberLinesPrev = lg_max;
 
   if (lg > 0) {
-    ErrorStatus =
-        decode2(hBs, pArcoData->c_prev + 2, mdctSpectrum, lg >> 1, lg_max >> 1);
+    decode2(hBs, pArcoData->c_prev + 2, mdctSpectrum, lg >> 1, lg_max >> 1);
   } else {
     FDKmemset(&pArcoData->c_prev[2], 1,
               sizeof(pArcoData->c_prev[2]) * (lg_max >> 1));
