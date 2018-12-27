@@ -1894,6 +1894,7 @@ INT CConcealment_TDFading(
     case ConcealState_FadeIn:
       idx = cntFadeFrames;
       idx -= TDFadeInStopBeforeFullLevel;
+      FDK_FALLTHROUGH;
     case ConcealState_Ok:
       fadeFactor = pConcealParams->fadeInFactor;
       idx = (concealState == ConcealState_Ok) ? -1 : idx;
@@ -2080,11 +2081,11 @@ static void CConcealment_TDNoise_Apply(CConcealmentInfo *const pConcealmentInfo,
       noiseVal = FX_DBL2FX_PCM(fMult(noiseValLong, TDNoiseAtt));
 
       /* add filtered noise - check for clipping, before */
-      if (noiseVal > (FIXP_PCM)0 &&
-          pcmdata[ii] > (FIXP_PCM)MAXVAL_FIXP_PCM - noiseVal) {
+      if (pcmdata[ii] > (FIXP_PCM)MAXVAL_FIXP_PCM - noiseVal &&
+          noiseVal > (FIXP_PCM)0) {
         noiseVal = noiseVal * (FIXP_PCM)-1;
-      } else if (noiseVal < (FIXP_PCM)0 &&
-                 pcmdata[ii] < (FIXP_PCM)MINVAL_FIXP_PCM - noiseVal) {
+      } else if (pcmdata[ii] < (FIXP_PCM)MINVAL_FIXP_PCM - noiseVal &&
+                 noiseVal < (FIXP_PCM)0) {
         noiseVal = noiseVal * (FIXP_PCM)-1;
       }
 
