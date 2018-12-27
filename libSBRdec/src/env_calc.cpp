@@ -626,8 +626,7 @@ static void apply_inter_tes(FIXP_DBL **qmfReal, FIXP_DBL **qmfImag,
         total_power_low >>= diff;
         total_power_low_sf = new_summand_sf;
       } else if (new_summand_sf < total_power_low_sf) {
-        new_summand >>=
-            fMin(DFRACT_BITS - 1, total_power_low_sf - new_summand_sf);
+        new_summand >>= total_power_low_sf - new_summand_sf;
       }
 
       total_power_low += (new_summand >> preShift2);
@@ -639,8 +638,7 @@ static void apply_inter_tes(FIXP_DBL **qmfReal, FIXP_DBL **qmfImag,
             fMin(DFRACT_BITS - 1, new_summand_sf - total_power_high_sf);
         total_power_high_sf = new_summand_sf;
       } else if (new_summand_sf < total_power_high_sf) {
-        new_summand >>=
-            fMin(DFRACT_BITS - 1, total_power_high_sf - new_summand_sf);
+        new_summand >>= total_power_high_sf - new_summand_sf;
       }
 
       total_power_high += (new_summand >> preShift2);
