@@ -325,8 +325,6 @@ SACDEC_ERROR SpatialDecParseMps212Config(
     INT coreSbrFrameLengthIndex) {
   int i;
 
-  FDKmemclear(pSpatialSpecificConfig, sizeof(SPATIAL_SPECIFIC_CONFIG));
-
   pSpatialSpecificConfig->stereoConfigIndex = stereoConfigIndex;
   pSpatialSpecificConfig->coreSbrFrameLengthIndex = coreSbrFrameLengthIndex;
   pSpatialSpecificConfig->freqRes =
@@ -448,8 +446,6 @@ SACDEC_ERROR SpatialDecParseSpecificConfig(
   int bsFreqRes, b3DaudioMode = 0;
   int numHeaderBits;
   int cfgStartPos, bitsAvailable;
-
-  FDKmemclear(pSpatialSpecificConfig, sizeof(SPATIAL_SPECIFIC_CONFIG));
 
   cfgStartPos = FDKgetValidBits(bitstream);
   /* It might be that we do not know the SSC length beforehand. */
