@@ -1413,9 +1413,7 @@ static TRANSPORTDEC_ERROR EldSpecificConfig_Parse(CSAudioSpecificConfig *asc,
         esc->m_useLdQmfTimeAlign = 1;
         if (cb->cbSsc != NULL) {
           ErrorStatus = (TRANSPORTDEC_ERROR)cb->cbSsc(
-              cb->cbSscData, hBs, asc->m_aot,
-              asc->m_samplingFrequency << esc->m_sbrSamplingRate,
-              asc->m_samplesPerFrame << esc->m_sbrSamplingRate,
+              cb->cbSscData, hBs, asc->m_aot, asc->m_extensionSamplingFrequency,
               1,  /* stereoConfigIndex */
               -1, /* nTimeSlots: read from bitstream */
               eldExtLen, asc->configMode, &asc->SacConfigChanged);
@@ -1814,16 +1812,9 @@ static TRANSPORTDEC_ERROR UsacRsv60DecoderConfig_Parse(
 
           if (usc->element[i].m_stereoConfigIndex > 0) {
             if (cb->cbSsc != NULL) {
-              int samplesPerFrame = asc->m_samplesPerFrame;
-
-              if (usc->m_sbrRatioIndex == 1) samplesPerFrame <<= 2;
-              if (usc->m_sbrRatioIndex == 2)
-                samplesPerFrame = (samplesPerFrame * 8) / 3;
-              if (usc->m_sbrRatioIndex == 3) samplesPerFrame <<= 1;
-
               /* Mps212Config() ISO/IEC FDIS 23003-3 */
               if (cb->cbSsc(cb->cbSscData, hBs, asc->m_aot,
-                            asc->m_extensionSamplingFrequency, samplesPerFrame,
+                            asc->m_extensionSamplingFrequency,
                             usc->element[i].m_stereoConfigIndex,
                             usc->m_coreSbrFrameLengthIndex,
                             0, /* don't know the length */
@@ -2190,9 +2181,8 @@ TRANSPORTDEC_ERROR AudioSpecificConfig_Parse(
     case AOT_MPEGS:
       if (cb->cbSsc != NULL) {
         if (cb->cbSsc(cb->cbSscData, bs, self->m_aot, self->m_samplingFrequency,
-                      self->m_samplesPerFrame, 1,
-                      -1, /* nTimeSlots: read from bitstream */
-                      0,  /* don't know the length */
+                      1, -1, /* nTimeSlots: read from bitstream */
+                      0,     /* don't know the length */
                       self->configMode, &self->SacConfigChanged)) {
           return TRANSPORTDEC_UNSUPPORTED_FORMAT;
         }
@@ -2375,17 +2365,10 @@ static TRANSPORTDEC_ERROR Drm_xHEAACDecoderConfig(
         /*usc->element[elemIdx].m_stereoConfigIndex =*/FDKreadBits(hBs, 2);
         if (usc->element[elemIdx].m_stereoConfigIndex > 0) {
           if (cb->cbSsc != NULL) {
-            int samplesPerFrame = asc->m_samplesPerFrame;
-
-            if (usc->m_sbrRatioIndex == 1) samplesPerFrame <<= 2;
-            if (usc->m_sbrRatioIndex == 2)
-              samplesPerFrame = (samplesPerFrame * 8) / 3;
-            if (usc->m_sbrRatioIndex == 3) samplesPerFrame <<= 1;
-
             ErrorStatus = (TRANSPORTDEC_ERROR)cb->cbSsc(
                 cb->cbSscData, hBs,
                 AOT_DRM_USAC, /* syntax differs from MPEG Mps212Config() */
-                asc->m_extensionSamplingFrequency, samplesPerFrame,
+                asc->m_extensionSamplingFrequency,
                 usc->element[elemIdx].m_stereoConfigIndex,
                 usc->m_coreSbrFrameLengthIndex, 0, /* don't know the length */
                 asc->configMode, &asc->SacConfigChanged);
