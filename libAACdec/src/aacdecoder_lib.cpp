@@ -1398,13 +1398,9 @@ aacDecoder_DecodeFrame(HANDLE_AACDECODER self, INT_PCM *pTimeData_extern,
         mpegSurroundDecoder_ConfigureQmfDomain(
             (CMpegSurroundDecoder *)self->pMpegSurroundDecoder, sac_interface,
             (UINT)self->streamInfo.aacSampleRate, self->streamInfo.aot);
-        if (self->qmfDomain.globalConf.nBandsAnalysis_requested > 0) {
-          self->qmfDomain.globalConf.nQmfTimeSlots_requested =
-              self->streamInfo.aacSamplesPerFrame /
-              self->qmfDomain.globalConf.nBandsAnalysis_requested;
-        } else {
-          self->qmfDomain.globalConf.nQmfTimeSlots_requested = 0;
-        }
+        self->qmfDomain.globalConf.nQmfTimeSlots_requested =
+            self->streamInfo.aacSamplesPerFrame /
+            self->qmfDomain.globalConf.nBandsAnalysis_requested;
       }
 
       self->qmfDomain.globalConf.TDinput = pTimeData;
