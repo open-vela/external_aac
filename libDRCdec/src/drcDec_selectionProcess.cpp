@@ -1006,15 +1006,23 @@ static DRCDEC_SELECTION_PROCESS_RETURN _preSelectionRequirement7(
   return DRCDEC_SELECTION_PROCESS_NO_ERROR;
 }
 
-static void _setSelectionDataInfo(DRCDEC_SELECTION_DATA* pData,
-                                  FIXP_DBL loudness,
-                                  FIXP_DBL loudnessNormalizationGainDb,
-                                  FIXP_DBL loudnessNormalizationGainDbMax,
-                                  FIXP_DBL loudnessDeviationMax,
-                                  FIXP_DBL signalPeakLevel,
-                                  FIXP_DBL outputPeakLevelMax,
-                                  int applyAdjustment) {
-  FIXP_DBL adjustment = 0;
+static void _setSelectionDataInfo(
+    DRCDEC_SELECTION_DATA* pData, FIXP_DBL loudness, /* e = 7 */
+    FIXP_DBL loudnessNormalizationGainDb,            /* e = 7 */
+    FIXP_DBL loudnessNormalizationGainDbMax,         /* e = 7 */
+    FIXP_DBL loudnessDeviationMax,                   /* e = 7 */
+    FIXP_DBL signalPeakLevel,                        /* e = 7 */
+    FIXP_DBL outputPeakLevelMax,                     /* e = 7 */
+    int applyAdjustment) {
+  FIXP_DBL adjustment = 0; /* e = 8 */
+
+  /* use e = 8 for all function parameters to prevent overflow */
+  loudness >>= 1;
+  loudnessNormalizationGainDb >>= 1;
+  loudnessNormalizationGainDbMax >>= 1;
+  loudnessDeviationMax >>= 1;
+  signalPeakLevel >>= 1;
+  outputPeakLevelMax >>= 1;
 
   if (applyAdjustment) {
     adjustment =
@@ -1028,6 +1036,14 @@ static void _setSelectionDataInfo(DRCDEC_SELECTION_DATA* pData,
   pData->outputLoudness = loudness + pData->loudnessNormalizationGainDbAdjusted;
   pData->outputPeakLevel =
       signalPeakLevel + pData->loudnessNormalizationGainDbAdjusted;
+
+  /* shift back to e = 7 using saturation */
+  pData->loudnessNormalizationGainDbAdjusted = SATURATE_LEFT_SHIFT(
+      pData->loudnessNormalizationGainDbAdjusted, 1, DFRACT_BITS);
+  pData->outputLoudness =
+      SATURATE_LEFT_SHIFT(pData->outputLoudness, 1, DFRACT_BITS);
+  pData->outputPeakLevel =
+      SATURATE_LEFT_SHIFT(pData->outputPeakLevel, 1, DFRACT_BITS);
 }
 
 static int _targetLoudnessInRange(
@@ -2157,6 +2173,9 @@ static DRCDEC_SELECTION_PROCESS_RETURN _selectDownmixMatrix(
   if (hSelProcOutput->activeDownmixId != 0) {
     for (i = 0; i < hUniDrcConfig->downmixInstructionsCount; i++) {
       DOWNMIX_INSTRUCTIONS* pDown = &(hUniDrcConfig->downmixInstructions[i]);
+      if (pDown->targetChannelCount > 8) {
+        continue;
+      }
 
       if (hSelProcOutput->activeDownmixId == pDown->downmixId) {
         hSelProcOutput->targetChannelCount = pDown->targetChannelCount;
@@ -2809,6 +2828,8 @@ static int _downmixCoefficientsArePresent(HANDLE_UNI_DRC_CONFIG hUniDrcConfig,
   for (i = 0; i < hUniDrcConfig->downmixInstructionsCount; i++) {
     if (hUniDrcConfig->downmixInstructions[i].downmixId == downmixId) {
       if (hUniDrcConfig->downmixInstructions[i].downmixCoefficientsPresent) {
+        if (hUniDrcConfig->downmixInstructions[i].targetChannelCount > 8)
+          return 0;
         *pIndex = i;
         return 1;
       }
