@@ -185,18 +185,10 @@ drcDec_readUniDrc(HANDLE_FDK_BITSTREAM hBs, HANDLE_UNI_DRC_CONFIG hUniDrcConfig,
     uniDrcConfigPresent = FDKreadBits(hBs, 1);
     if (uniDrcConfigPresent) {
       err = drcDec_readUniDrcConfig(hBs, hUniDrcConfig);
-      if (err) {
-        /* clear config, if parsing error occured */
-        FDKmemclear(hUniDrcConfig, sizeof(UNI_DRC_CONFIG));
-        hUniDrcConfig->diff = 1;
-      }
+      if (err) return err;
     }
     err = drcDec_readLoudnessInfoSet(hBs, hLoudnessInfoSet);
-    if (err) {
-      /* clear config, if parsing error occured */
-      FDKmemclear(hLoudnessInfoSet, sizeof(LOUDNESS_INFO_SET));
-      hLoudnessInfoSet->diff = 1;
-    }
+    if (err) return err;
   }
 
   if (hUniDrcGain != NULL) {
@@ -1138,7 +1130,7 @@ static DRC_ERROR _readDrcCoefficientsUniDrc(HANDLE_FDK_BITSTREAM hBs,
     drcCharacteristicLeftPresent = FDKreadBits(hBs, 1);
     if (drcCharacteristicLeftPresent) {
       pCoef->characteristicLeftCount = FDKreadBits(hBs, 4);
-      if ((pCoef->characteristicLeftCount + 1) > 16) return DE_MEMORY_ERROR;
+      if ((pCoef->characteristicLeftCount + 1) > 8) return DE_MEMORY_ERROR;
       for (i = 0; i < pCoef->characteristicLeftCount; i++) {
         err = _readCustomDrcCharacteristic(
             hBs, CS_LEFT, &(pCoef->characteristicLeftFormat[i + 1]),
@@ -1149,7 +1141,7 @@ static DRC_ERROR _readDrcCoefficientsUniDrc(HANDLE_FDK_BITSTREAM hBs,
     drcCharacteristicRightPresent = FDKreadBits(hBs, 1);
     if (drcCharacteristicRightPresent) {
       pCoef->characteristicRightCount = FDKreadBits(hBs, 4);
-      if ((pCoef->characteristicRightCount + 1) > 16) return DE_MEMORY_ERROR;
+      if ((pCoef->characteristicRightCount + 1) > 8) return DE_MEMORY_ERROR;
       for (i = 0; i < pCoef->characteristicRightCount; i++) {
         err = _readCustomDrcCharacteristic(
             hBs, CS_RIGHT, &(pCoef->characteristicRightFormat[i + 1]),
