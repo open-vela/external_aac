@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -173,11 +173,13 @@ static int isResetNeeded(HANDLE_DRC_DECODER hDrcDec,
   return resetNeeded;
 }
 
-static void startSelectionProcess(HANDLE_DRC_DECODER hDrcDec) {
+static DRC_DEC_ERROR startSelectionProcess(HANDLE_DRC_DECODER hDrcDec) {
+  DRC_ERROR dErr = DE_OK;
+  DRCDEC_SELECTION_PROCESS_RETURN sErr = DRCDEC_SELECTION_PROCESS_NO_ERROR;
   int uniDrcConfigHasChanged = 0;
   SEL_PROC_OUTPUT oldSelProcOutput = hDrcDec->selProcOutput;
 
-  if (!hDrcDec->status) return;
+  if (!hDrcDec->status) return DRC_DEC_NOT_READY;
 
   if (hDrcDec->functionalRange & DRC_DEC_SELECTION) {
     uniDrcConfigHasChanged = hDrcDec->uniDrcConfig.diff;
@@ -187,9 +189,10 @@ static void startSelectionProcess(HANDLE_DRC_DECODER hDrcDec) {
        */
       hDrcDec->selProcOutput.numSelectedDrcSets = 0;
 
-      drcDec_SelectionProcess_Process(
+      sErr = drcDec_SelectionProcess_Process(
           hDrcDec->hSelectionProc, &(hDrcDec->uniDrcConfig),
           &(hDrcDec->loudnessInfoSet), &(hDrcDec->selProcOutput));
+      if (sErr) return DRC_DEC_OK;
 
       hDrcDec->selProcInputDiff = 0;
       hDrcDec->uniDrcConfig.diff = 0;
@@ -199,12 +202,15 @@ static void startSelectionProcess(HANDLE_DRC_DECODER hDrcDec) {
 
   if (hDrcDec->functionalRange & DRC_DEC_GAIN) {
     if (isResetNeeded(hDrcDec, oldSelProcOutput) || uniDrcConfigHasChanged) {
-      drcDec_GainDecoder_Config(hDrcDec->hGainDec, &(hDrcDec->uniDrcConfig),
-                                hDrcDec->selProcOutput.numSelectedDrcSets,
-                                hDrcDec->selProcOutput.selectedDrcSetIds,
-                                hDrcDec->selProcOutput.selectedDownmixIds);
+      dErr =
+          drcDec_GainDecoder_Config(hDrcDec->hGainDec, &(hDrcDec->uniDrcConfig),
+                                    hDrcDec->selProcOutput.numSelectedDrcSets,
+                                    hDrcDec->selProcOutput.selectedDrcSetIds,
+                                    hDrcDec->selProcOutput.selectedDownmixIds);
+      if (dErr) return DRC_DEC_OK;
     }
   }
+  return DRC_DEC_OK;
 }
 
 DRC_DEC_ERROR
@@ -438,12 +444,6 @@ FDK_drcDec_SetParam(HANDLE_DRC_DECODER hDrcDec,
       sErr = drcDec_SelectionProcess_SetParam(
           hDrcDec->hSelectionProc, SEL_PROC_LOUDNESS_MEASUREMENT_METHOD,
           requestValue, &(hDrcDec->selProcInputDiff));
-      if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
-      break;
-    case DRC_DEC_ALBUM_MODE:
-      sErr = drcDec_SelectionProcess_SetParam(hDrcDec->hSelectionProc,
-                                              SEL_PROC_ALBUM_MODE, requestValue,
-                                              &(hDrcDec->selProcInputDiff));
       if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
       break;
     default:
@@ -721,9 +721,9 @@ FDK_drcDec_ReadUniDrc(HANDLE_DRC_DECODER hDrcDec,
       drcDec_GainDecoder_GetFrameSize(hDrcDec->hGainDec),
       drcDec_GainDecoder_GetDeltaTminDefault(hDrcDec->hGainDec),
       &(hDrcDec->uniDrcGain));
+  if (dErr) return DRC_DEC_NOT_OK;
 
   startSelectionProcess(hDrcDec);
-  if (dErr) return DRC_DEC_NOT_OK;
 
   hDrcDec->status = DRC_DEC_NEW_GAIN_PAYLOAD;
 
