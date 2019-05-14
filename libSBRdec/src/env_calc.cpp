@@ -493,7 +493,7 @@ static void mapSineFlags(
   }
 }
 
-#define INTER_TES_SF_CHANGE 4
+#define INTER_TES_SF_CHANGE 3
 
 typedef struct {
   FIXP_DBL subsample_power_low[(((1024) / (32) * (4) / 2) + (3 * (4)))];
@@ -2431,7 +2431,8 @@ static void adjustTimeSlot_EldGrid(
     sbNoise = *pNoiseLevel++;
     if (((INT)sineLevel_curr | noNoiseFlag) == 0) {
       signalReal +=
-          fMult(FDK_sbrDecoder_sbr_randomPhase[phaseIndex][0], sbNoise);
+          (fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[phaseIndex][0], sbNoise)
+           << 4);
     }
     signalReal += sineLevel_curr * p_harmonicPhase[0];
     signalReal =
@@ -2465,7 +2466,8 @@ static void adjustTimeSlot_EldGrid(
     sbNoise = *pNoiseLevel++;
     if (((INT)sineLevel_curr | noNoiseFlag) == 0) {
       signalReal +=
-          fMult(FDK_sbrDecoder_sbr_randomPhase[phaseIndex][0], sbNoise);
+          (fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[phaseIndex][0], sbNoise)
+           << 4);
     }
     signalReal += sineLevel_curr * p_harmonicPhase[0];
     *ptrReal++ = signalReal;
@@ -2525,7 +2527,8 @@ static void adjustTimeSlotLC(
   else if (!noNoiseFlag)
     /* Add noisefloor to the amplified signal */
     signalReal +=
-        fMult(FDK_sbrDecoder_sbr_randomPhase[index][0], pNoiseLevel[0]);
+        (fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[index][0], pNoiseLevel[0])
+         << 4);
 
   {
     if (!(harmIndex & 0x1)) {
@@ -2572,8 +2575,9 @@ static void adjustTimeSlotLC(
             !noNoiseFlag) {
           /* Add noisefloor to the amplified signal */
           index &= (SBR_NF_NO_RANDOM_VAL - 1);
-          signalReal +=
-              fMult(FDK_sbrDecoder_sbr_randomPhase[index][0], pNoiseLevel[0]);
+          signalReal += (fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[index][0],
+                                   pNoiseLevel[0])
+                         << 4);
         }
 
         /* The next multiplication constitutes the actual envelope adjustment of
@@ -2598,8 +2602,9 @@ static void adjustTimeSlotLC(
         else if (!noNoiseFlag) {
           /* Add noisefloor to the amplified signal */
           index &= (SBR_NF_NO_RANDOM_VAL - 1);
-          signalReal +=
-              fMult(FDK_sbrDecoder_sbr_randomPhase[index][0], pNoiseLevel[0]);
+          signalReal += (fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[index][0],
+                                   pNoiseLevel[0])
+                         << 4);
         }
 
         pNoiseLevel++;
@@ -2628,8 +2633,10 @@ static void adjustTimeSlotLC(
     else if (!noNoiseFlag) {
       /* Add noisefloor to the amplified signal */
       index &= (SBR_NF_NO_RANDOM_VAL - 1);
-      signalReal = signalReal + fMult(FDK_sbrDecoder_sbr_randomPhase[index][0],
-                                      pNoiseLevel[0]);
+      signalReal =
+          signalReal +
+          (fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[index][0], pNoiseLevel[0])
+           << 4);
     }
 
     if (!(harmIndex & 0x1)) {
@@ -2734,9 +2741,11 @@ static void adjustTimeSlotHQ_GainAndNoise(
         /* Add noisefloor to the amplified signal */
         index &= (SBR_NF_NO_RANDOM_VAL - 1);
         noiseReal =
-            fMult(FDK_sbrDecoder_sbr_randomPhase[index][0], smoothedNoise);
+            fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[index][0], smoothedNoise)
+            << 4;
         noiseImag =
-            fMult(FDK_sbrDecoder_sbr_randomPhase[index][1], smoothedNoise);
+            fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[index][1], smoothedNoise)
+            << 4;
         *ptrReal++ = (signalReal + noiseReal);
         *ptrImag++ = (signalImag + noiseImag);
       }
@@ -2754,12 +2763,13 @@ static void adjustTimeSlotHQ_GainAndNoise(
         smoothedNoise = noiseLevel[k];
         index &= (SBR_NF_NO_RANDOM_VAL - 1);
         noiseReal =
-            fMult(FDK_sbrDecoder_sbr_randomPhase[index][0], smoothedNoise);
+            fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[index][0], smoothedNoise);
         noiseImag =
-            fMult(FDK_sbrDecoder_sbr_randomPhase[index][1], smoothedNoise);
+            fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[index][1], smoothedNoise);
 
-        signalReal += noiseReal;
-        signalImag += noiseImag;
+        /* FDK_sbrDecoder_sbr_randomPhase is downscaled by 2^3 */
+        signalReal += noiseReal << 4;
+        signalImag += noiseImag << 4;
       }
       *ptrReal++ = signalReal;
       *ptrImag++ = signalImag;
@@ -2934,10 +2944,13 @@ static void adjustTimeSlotHQ(
         } else {
           /* Add noisefloor to the amplified signal */
           index &= (SBR_NF_NO_RANDOM_VAL - 1);
+          /* FDK_sbrDecoder_sbr_randomPhase is downscaled by 2^3 */
           noiseReal =
-              fMult(FDK_sbrDecoder_sbr_randomPhase[index][0], smoothedNoise);
+              fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[index][0], smoothedNoise)
+              << 4;
           noiseImag =
-              fMult(FDK_sbrDecoder_sbr_randomPhase[index][1], smoothedNoise);
+              fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[index][1], smoothedNoise)
+              << 4;
           *ptrReal++ = (signalReal + noiseReal);
           *ptrImag++ = (signalImag + noiseImag);
         }
@@ -2979,13 +2992,14 @@ static void adjustTimeSlotHQ(
           /* Add noisefloor to the amplified signal */
           smoothedNoise = noiseLevel[k];
           index &= (SBR_NF_NO_RANDOM_VAL - 1);
-          noiseReal =
-              fMult(FDK_sbrDecoder_sbr_randomPhase[index][0], smoothedNoise);
-          noiseImag =
-              fMult(FDK_sbrDecoder_sbr_randomPhase[index][1], smoothedNoise);
+          noiseReal = fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[index][0],
+                                smoothedNoise);
+          noiseImag = fMultDiv2(FDK_sbrDecoder_sbr_randomPhase[index][1],
+                                smoothedNoise);
 
-          signalReal += noiseReal;
-          signalImag += noiseImag;
+          /* FDK_sbrDecoder_sbr_randomPhase is downscaled by 2^3 */
+          signalReal += noiseReal << 4;
+          signalImag += noiseImag << 4;
         }
       }
       *ptrReal++ = signalReal;
