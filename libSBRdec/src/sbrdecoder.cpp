@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -871,10 +871,11 @@ INT sbrDecoder_Header(HANDLE_SBRDECODER self, HANDLE_FDK_BITSTREAM hBs,
         if (sbrError == SBRDEC_OK) {
           hSbrHeader->syncState = SBR_HEADER;
           hSbrHeader->status |= SBRDEC_HDR_STAT_UPDATE;
-        } else {
-          hSbrHeader->syncState = SBR_NOT_INITIALIZED;
-          hSbrHeader->status = HEADER_ERROR;
         }
+        /* else {
+          Since we already have overwritten the old SBR header the only way out
+        is UPSAMPLING! This will be prepared in the next step.
+        } */
       }
     }
   }
@@ -1148,11 +1149,6 @@ SBR_ERROR sbrDecoder_Parse(HANDLE_SBRDECODER self, HANDLE_FDK_BITSTREAM hBs,
   int fDoDecodeSbrData = 1;
 
   int lastSlot, lastHdrSlot = 0, thisHdrSlot = 0;
-
-  if (*count <= 0) {
-    setFrameErrorFlag(self->pSbrElement[elementIndex], FRAME_ERROR);
-    return SBRDEC_OK;
-  }
 
   /* SBR sanity checks */
   if (self == NULL) {
@@ -1681,9 +1677,6 @@ static SBR_ERROR sbrDecoder_DecodeElement(
   /* reset */
   if (hSbrHeader->status & SBRDEC_HDR_STAT_RESET) {
     int ch;
-    int applySbrProc = (hSbrHeader->syncState == SBR_ACTIVE ||
-                        (hSbrHeader->frameErrorFlag == 0 &&
-                         hSbrHeader->syncState == SBR_HEADER));
     for (ch = 0; ch < numElementChannels; ch++) {
       SBR_ERROR errorStatusTmp = SBRDEC_OK;
 
@@ -1695,9 +1688,7 @@ static SBR_ERROR sbrDecoder_DecodeElement(
         hSbrHeader->syncState = UPSAMPLING;
       }
     }
-    if (applySbrProc) {
-      hSbrHeader->status &= ~SBRDEC_HDR_STAT_RESET;
-    }
+    hSbrHeader->status &= ~SBRDEC_HDR_STAT_RESET;
   }
 
   /* decoding */
