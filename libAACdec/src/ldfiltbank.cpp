@@ -216,7 +216,6 @@ int InvMdctTransformLowDelay_fdk(FIXP_DBL *mdctData, const int mdctData_e,
   int scale = mdctData_e + MDCT_OUT_HEADROOM -
               LDFB_HEADROOM; /* The LDFB_HEADROOM is compensated inside
                                 multE2_DinvF_fdk() below */
-  int i;
 
   /* Select LD window slope */
   switch (N) {
@@ -262,11 +261,10 @@ int InvMdctTransformLowDelay_fdk(FIXP_DBL *mdctData, const int mdctData_e,
   }
 
   if (gain != (FIXP_DBL)0) {
-    for (i = 0; i < N; i++) {
-      mdctData[i] = fMult(mdctData[i], gain);
-    }
+    scaleValuesWithFactor(mdctData, gain, N, scale);
+  } else {
+    scaleValues(mdctData, N, scale);
   }
-  scaleValuesSaturate(mdctData, N, scale);
 
   /* Since all exponent and factors have been applied, current exponent is zero.
    */
