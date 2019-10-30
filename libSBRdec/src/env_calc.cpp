@@ -739,7 +739,8 @@ static void apply_inter_tes(FIXP_DBL **qmfReal, FIXP_DBL **qmfImag,
             fMin(DFRACT_BITS - 1, new_summand_sf - total_power_high_after_sf);
         total_power_high_after_sf = new_summand_sf;
       } else if (new_summand_sf < total_power_high_after_sf) {
-        subsample_power_high[i] >>= total_power_high_after_sf - new_summand_sf;
+        subsample_power_high[i] >>=
+            fMin(DFRACT_BITS - 1, total_power_high_after_sf - new_summand_sf);
       }
       total_power_high_after += subsample_power_high[i] >> preShift2;
     }
@@ -1477,7 +1478,7 @@ void calculateSbrEnvelope(
 
       for (k = 0; k < noSubbands; k++) {
         int sc = scale_change - pNrgs->nrgGain_e[k] + (sc_change - 1);
-        pNrgs->nrgGain[k] >>= sc;
+        pNrgs->nrgGain[k] >>= fixMin(sc, DFRACT_BITS - 1);
         pNrgs->nrgGain_e[k] += sc;
       }
 
@@ -1485,7 +1486,7 @@ void calculateSbrEnvelope(
         for (k = 0; k < noSubbands; k++) {
           int sc =
               scale_change - h_sbr_cal_env->filtBuffer_e[k] + (sc_change - 1);
-          h_sbr_cal_env->filtBuffer[k] >>= sc;
+          h_sbr_cal_env->filtBuffer[k] >>= fixMin(sc, DFRACT_BITS - 1);
         }
       }
 
@@ -1576,12 +1577,13 @@ void calculateSbrEnvelope(
           FDK_ASSERT(!iTES_enable); /* not supported */
           if (flags & SBRDEC_ELD_GRID) {
             /* FDKmemset(analysBufferReal[j], 0, 64 * sizeof(FIXP_DBL)); */
-            adjustTimeSlot_EldGrid(&analysBufferReal[j][lowSubband], pNrgs,
-                                   &h_sbr_cal_env->harmIndex, lowSubband,
-                                   noSubbands,
-                                   fMin(scale_change, DFRACT_BITS - 1),
-                                   noNoiseFlag, &h_sbr_cal_env->phaseIndex,
-                                   EXP2SCALE(adj_e) - sbrScaleFactor->lb_scale);
+            adjustTimeSlot_EldGrid(
+                &analysBufferReal[j][lowSubband], pNrgs,
+                &h_sbr_cal_env->harmIndex, lowSubband, noSubbands,
+                fMin(scale_change, DFRACT_BITS - 1), noNoiseFlag,
+                &h_sbr_cal_env->phaseIndex,
+                fMax(EXP2SCALE(adj_e) - sbrScaleFactor->lb_scale,
+                     -(DFRACT_BITS - 1)));
           } else {
             adjustTimeSlotLC(&analysBufferReal[j][lowSubband], pNrgs,
                              &h_sbr_cal_env->harmIndex, lowSubband, noSubbands,
@@ -1830,7 +1832,8 @@ static void equalizeFiltBufferExp(
     diff = (int)(nrgGain_e[band] - filtBuffer_e[band]);
     if (diff > 0) {
       filtBuffer[band] >>=
-          diff; /* Compensate for the scale change by shifting the mantissa. */
+          fMin(diff, DFRACT_BITS - 1); /* Compensate for the scale change by
+                                          shifting the mantissa. */
       filtBuffer_e[band] += diff; /* New gain is bigger, use its exponent */
     } else if (diff < 0) {
       /* The buffered gains seem to be larger, but maybe there
@@ -1850,8 +1853,8 @@ static void equalizeFiltBufferExp(
         filtBuffer_e[band] -= reserve; /* Compensate in the exponent: */
 
         /* For the remaining difference, change the new gain value */
-        diff = fixMin(-(reserve + diff), DFRACT_BITS - 1);
-        nrgGain[band] >>= diff;
+        diff = -(reserve + diff);
+        nrgGain[band] >>= fMin(diff, DFRACT_BITS - 1);
         nrgGain_e[band] += diff;
       }
     }

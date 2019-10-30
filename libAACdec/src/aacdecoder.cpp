@@ -1303,7 +1303,8 @@ static void CAacDecoder_DeInit(HANDLE_AACDECODER self,
                                const int subStreamIndex) {
   int ch;
   int aacChannelOffset = 0, aacChannels = (8);
-  int numElements = (((8)) + (8)), elementOffset = 0;
+  int numElements = (3 * ((8) * 2) + (((8) * 2)) / 2 + 4 * (1) + 1),
+      elementOffset = 0;
 
   if (self == NULL) return;
 
@@ -1928,6 +1929,9 @@ CAacDecoder_Init(HANDLE_AACDECODER self, const CSAudioSpecificConfig *asc,
           self->samplingRateInfo[0].samplingRate / self->downscaleFactor;
       self->streamInfo.aacSamplesPerFrame =
           asc->m_samplesPerFrame / self->downscaleFactor;
+      if (self->streamInfo.aacSampleRate <= 0) {
+        return AAC_DEC_UNSUPPORTED_SAMPLINGRATE;
+      }
     }
   }
 
@@ -3384,7 +3388,8 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
        * LR) */
       if ((aacChannels == 2) && bsPseudoLr) {
         int i, offset2;
-        const FIXP_SGL invSqrt2 = FL2FXCONST_SGL(0.707106781186547f);
+        const FIXP_SGL invSqrt2 =
+            FL2FXCONST_SGL(0.353553390593273f); /* scaled by -1 */
         FIXP_PCM *pTD = pTimeData;
 
         offset2 = timeDataChannelOffset;
@@ -3395,11 +3400,14 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
           L = fMult(L, invSqrt2);
           R = fMult(R, invSqrt2);
 #if (SAMPLE_BITS == 16)
-          pTD[0] = FX_DBL2FX_PCM(fAddSaturate(L + R, (FIXP_DBL)0x8000));
-          pTD[offset2] = FX_DBL2FX_PCM(fAddSaturate(L - R, (FIXP_DBL)0x8000));
+          pTD[0] = (FIXP_SGL)SATURATE_RIGHT_SHIFT(L + R + (FIXP_DBL)(1 << 14),
+                                                  15, FRACT_BITS);
+          pTD[offset2] = (FIXP_SGL)SATURATE_RIGHT_SHIFT(
+              L - R + (FIXP_DBL)(1 << 14), 15, FRACT_BITS);
 #else
-          pTD[0] = FX_DBL2FX_PCM(L + R);
-          pTD[offset2] = FX_DBL2FX_PCM(L - R);
+          pTD[0] = SATURATE_LEFT_SHIFT(FX_DBL2FX_PCM(L + R), 1, DFRACT_BITS);
+          pTD[offset2] =
+              SATURATE_LEFT_SHIFT(FX_DBL2FX_PCM(L - R), 1, DFRACT_BITS);
 #endif
           pTD++;
         }
