@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -1228,6 +1228,7 @@ static void CConcealment_InterpolateBuffer(FIXP_DBL *spectrum,
   int sfb, line = 0;
   int fac_shift;
   int fac_mod;
+  FIXP_DBL accu;
 
   for (sfb = 0; sfb < sfbCnt; sfb++) {
     fac_shift =
@@ -1235,11 +1236,15 @@ static void CConcealment_InterpolateBuffer(FIXP_DBL *spectrum,
     fac_mod = fac_shift & 3;
     fac_shift = (fac_shift >> 2) + 1;
     fac_shift += *pSpecScalePrv - fixMax(*pSpecScalePrv, *pSpecScaleAct);
-    fac_shift = fMax(fMin(fac_shift, DFRACT_BITS - 1), -(DFRACT_BITS - 1));
 
     for (; line < pSfbOffset[sfb + 1]; line++) {
-      FIXP_DBL accu = fMult(*(spectrum + line), facMod4Table[fac_mod]);
-      *(spectrum + line) = scaleValue(accu, fac_shift);
+      accu = fMult(*(spectrum + line), facMod4Table[fac_mod]);
+      if (fac_shift < 0) {
+        accu >>= -fac_shift;
+      } else {
+        accu <<= fac_shift;
+      }
+      *(spectrum + line) = accu;
     }
   }
   *pSpecScaleOut = fixMax(*pSpecScalePrv, *pSpecScaleAct);
@@ -1613,7 +1618,7 @@ static void CConcealment_ApplyRandomSign(int randomPhase, FIXP_DBL *spec,
     }
 
     if (packedSign & 0x1) {
-      spec[i] = -spec[i];
+      spec[i] = -fMax(spec[i], (FIXP_DBL)(MINVAL_DBL + 1));
     }
     packedSign >>= 1;
 
