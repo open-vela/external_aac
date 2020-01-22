@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -199,8 +199,11 @@ drcDec_readUniDrc(HANDLE_FDK_BITSTREAM hBs, HANDLE_UNI_DRC_CONFIG hUniDrcConfig,
     }
   }
 
-  err = drcDec_readUniDrcGain(hBs, hUniDrcConfig, frameSize, deltaTminDefault,
-                              hUniDrcGain);
+  if (hUniDrcGain != NULL) {
+    err = drcDec_readUniDrcGain(hBs, hUniDrcConfig, frameSize, deltaTminDefault,
+                                hUniDrcGain);
+    if (err) return err;
+  }
 
   return err;
 }
@@ -484,13 +487,10 @@ drcDec_readUniDrcGain(HANDLE_FDK_BITSTREAM hBs,
   int seq, gainSequenceCount;
   DRC_COEFFICIENTS_UNI_DRC* pCoef =
       selectDrcCoefficients(hUniDrcConfig, LOCATION_SELECTED);
-  if (hUniDrcGain == NULL) return DE_NOT_OK;
-  hUniDrcGain->status = 0;
-  if (pCoef) {
-    gainSequenceCount = fMin(pCoef->gainSequenceCount, (UCHAR)12);
-  } else {
-    gainSequenceCount = 0;
-  }
+  if (pCoef == NULL) return DE_OK;
+  if (hUniDrcGain == NULL) return DE_OK; /* hUniDrcGain not initialized yet */
+
+  gainSequenceCount = fMin(pCoef->gainSequenceCount, (UCHAR)12);
 
   for (seq = 0; seq < gainSequenceCount; seq++) {
     UCHAR index = pCoef->gainSetIndexForGainSequence[seq];
@@ -518,9 +518,6 @@ drcDec_readUniDrcGain(HANDLE_FDK_BITSTREAM hBs,
     if (err) return err;
   }
 
-  if (err == DE_OK && gainSequenceCount > 0) {
-    hUniDrcGain->status = 1;
-  }
   return err;
 }
 
