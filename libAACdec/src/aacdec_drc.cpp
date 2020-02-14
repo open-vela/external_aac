@@ -190,6 +190,7 @@ void aacDecoder_drcInit(HANDLE_AAC_DRC self) {
   pParams->usrBoost = FL2FXCONST_DBL(0.0f);
   pParams->targetRefLevel = 96;
   pParams->expiryFrame = AACDEC_DRC_DFLT_EXPIRY_FRAMES;
+  pParams->applyDigitalNorm = ON;
   pParams->applyHeavyCompression = OFF;
   pParams->usrApplyHeavyCompression = OFF;
 
@@ -273,8 +274,11 @@ AAC_DECODER_ERROR aacDecoder_drcSetParam(HANDLE_AAC_DRC self,
         return AAC_DEC_INVALID_HANDLE;
       }
       if (value < 0) {
+        self->params.applyDigitalNorm = OFF;
         self->params.targetRefLevel = -1;
       } else {
+        /* ref_level must be between 0 and MAX_REFERENCE_LEVEL, inclusive */
+        self->params.applyDigitalNorm = ON;
         if (self->params.targetRefLevel != (SCHAR)value) {
           self->params.targetRefLevel = (SCHAR)value;
           self->progRefLevel = (SCHAR)value; /* Always set the program reference
@@ -284,6 +288,16 @@ AAC_DECODER_ERROR aacDecoder_drcSetParam(HANDLE_AAC_DRC self,
         }
         self->update = 1;
       }
+      break;
+    case APPLY_NORMALIZATION:
+      if ((value != OFF) && (value != ON)) {
+        return AAC_DEC_SET_PARAM_FAIL;
+      }
+      if (self == NULL) {
+        return AAC_DEC_INVALID_HANDLE;
+      }
+      /* Store new parameter value */
+      self->params.applyDigitalNorm = (UCHAR)value;
       break;
     case APPLY_HEAVY_COMPRESSION:
       if ((value != OFF) && (value != ON)) {
@@ -912,9 +926,11 @@ void aacDecoder_drcApply(HANDLE_AAC_DRC self, void *pSbrDec,
       FDK_ASSERT(0);
     }
   }
-  /* Reset normalization gain since this module must not apply it */
-  norm_mantissa = FL2FXCONST_DBL(0.5f);
-  norm_exponent = 1;
+  if (self->params.applyDigitalNorm == OFF) {
+    /* Reset normalization gain since this module must not apply it */
+    norm_mantissa = FL2FXCONST_DBL(0.5f);
+    norm_exponent = 1;
+  }
 
   /* calc scale factors */
   for (band = 0; band < numBands; band++) {
