@@ -32,7 +32,8 @@ cc_library_static {
             "signed-integer-overflow",
             "bounds",
         ],
-        cfi: true,
+        // Enable CFI if this becomes a shared library.
+        // cfi: true,
     },
     shared_libs: [
         "liblog",
@@ -56,13 +57,6 @@ cc_library_static {
     target: {
         darwin: {
             enabled: false,
-        },
-        android: {
-            sanitize: {
-                diag: {
-                    cfi: true,
-                },
-            },
         },
     },
 
