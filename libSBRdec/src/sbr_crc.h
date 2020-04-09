@@ -92,82 +92,47 @@ www.iis.fraunhofer.de/amm
 amm-info@iis.fraunhofer.de
 ----------------------------------------------------------------------------- */
 
-/**************************** AAC decoder library ******************************
+/**************************** SBR decoder library ******************************
 
-   Author(s):   Matthias Hildenbrand
+   Author(s):
 
    Description:
 
 *******************************************************************************/
 
-#include "FDK_delay.h"
+/*!
+  \file
+  \brief  CRC checking routines
+*/
+#ifndef SBR_CRC_H
+#define SBR_CRC_H
 
-#include "genericStds.h"
+#include "sbrdecoder.h"
 
-#define MAX_FRAME_LENGTH (1024)
+#include "FDK_bitstream.h"
 
-INT FDK_Delay_Create(FDK_SignalDelay* data, const USHORT delay,
-                     const UCHAR num_channels) {
-  FDK_ASSERT(data != NULL);
-  FDK_ASSERT(num_channels > 0);
+/* some useful crc polynoms:
 
-  if (delay > 0) {
-    data->delay_line =
-        (INT_PCM*)FDKcalloc(num_channels * delay, sizeof(INT_PCM));
-    if (data->delay_line == NULL) {
-      return -1;
-    }
-  } else {
-    data->delay_line = NULL;
-  }
-  data->num_channels = num_channels;
-  data->delay = delay;
+crc5: x^5+x^4+x^2+x^1+1
+crc6: x^6+x^5+x^3+x^2+x+1
+crc7: x^7+x^6+x^2+1
+crc8: x^8+x^2+x+x+1
+*/
 
-  return 0;
-}
+/* default SBR CRC */ /* G(x) = x^10 + x^9 + x^5 + x^4 + x + 1 */
+#define SBR_CRC_POLY 0x0233
+#define SBR_CRC_MASK 0x0200
+#define SBR_CRC_START 0x0000
+#define SBR_CRC_RANGE 0x03FF
 
-void FDK_Delay_Apply(FDK_SignalDelay* data, FIXP_PCM* time_buffer,
-                     const UINT frame_length, const UCHAR channel) {
-  FDK_ASSERT(data != NULL);
+typedef struct {
+  USHORT crcState;
+  USHORT crcMask;
+  USHORT crcPoly;
+} CRC_BUFFER;
 
-  if (data->delay > 0) {
-    C_ALLOC_SCRATCH_START(tmp, FIXP_PCM, MAX_FRAME_LENGTH)
-    FDK_ASSERT(frame_length <= MAX_FRAME_LENGTH);
-    FDK_ASSERT(channel < data->num_channels);
-    FDK_ASSERT(time_buffer != NULL);
-    if (frame_length >= data->delay) {
-      FDKmemcpy(tmp, &time_buffer[frame_length - data->delay],
-                data->delay * sizeof(FIXP_PCM));
-      FDKmemmove(&time_buffer[data->delay], &time_buffer[0],
-                 (frame_length - data->delay) * sizeof(FIXP_PCM));
-      FDKmemcpy(&time_buffer[0], &data->delay_line[channel * data->delay],
-                data->delay * sizeof(FIXP_PCM));
-      FDKmemcpy(&data->delay_line[channel * data->delay], tmp,
-                data->delay * sizeof(FIXP_PCM));
-    } else {
-      FDKmemcpy(tmp, &time_buffer[0], frame_length * sizeof(FIXP_PCM));
-      FDKmemcpy(&time_buffer[0], &data->delay_line[channel * data->delay],
-                frame_length * sizeof(FIXP_PCM));
-      FDKmemcpy(&data->delay_line[channel * data->delay],
-                &data->delay_line[channel * data->delay + frame_length],
-                (data->delay - frame_length) * sizeof(FIXP_PCM));
-      FDKmemcpy(&data->delay_line[channel * data->delay +
-                                  (data->delay - frame_length)],
-                tmp, frame_length * sizeof(FIXP_PCM));
-    }
-    C_ALLOC_SCRATCH_END(tmp, FIXP_PCM, MAX_FRAME_LENGTH)
-  }
+typedef CRC_BUFFER *HANDLE_CRC;
 
-  return;
-}
+int SbrCrcCheck(HANDLE_FDK_BITSTREAM hBitBuf, LONG NrCrcBits);
 
-void FDK_Delay_Destroy(FDK_SignalDelay* data) {
-  if (data->delay_line != NULL) {
-    FDKfree(data->delay_line);
-  }
-  data->delay_line = NULL;
-  data->delay = 0;
-  data->num_channels = 0;
-
-  return;
-}
+#endif
