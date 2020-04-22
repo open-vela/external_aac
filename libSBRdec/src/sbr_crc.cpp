@@ -92,82 +92,101 @@ www.iis.fraunhofer.de/amm
 amm-info@iis.fraunhofer.de
 ----------------------------------------------------------------------------- */
 
-/**************************** AAC decoder library ******************************
+/**************************** SBR decoder library ******************************
 
-   Author(s):   Matthias Hildenbrand
+   Author(s):
 
    Description:
 
 *******************************************************************************/
 
-#include "FDK_delay.h"
+/*!
+  \file
+  \brief  CRC check coutines
+*/
 
-#include "genericStds.h"
+#include "sbr_crc.h"
 
-#define MAX_FRAME_LENGTH (1024)
+#include "FDK_bitstream.h"
+#include "transcendent.h"
 
-INT FDK_Delay_Create(FDK_SignalDelay* data, const USHORT delay,
-                     const UCHAR num_channels) {
-  FDK_ASSERT(data != NULL);
-  FDK_ASSERT(num_channels > 0);
+#define MAXCRCSTEP 16
+#define MAXCRCSTEP_LD 4
 
-  if (delay > 0) {
-    data->delay_line =
-        (INT_PCM*)FDKcalloc(num_channels * delay, sizeof(INT_PCM));
-    if (data->delay_line == NULL) {
-      return -1;
-    }
-  } else {
-    data->delay_line = NULL;
+/*!
+  \brief     crc calculation
+*/
+static ULONG calcCRC(HANDLE_CRC hCrcBuf, ULONG bValue, int nBits) {
+  int i;
+  ULONG bMask = (1UL << (nBits - 1));
+
+  for (i = 0; i < nBits; i++, bMask >>= 1) {
+    USHORT flag = (hCrcBuf->crcState & hCrcBuf->crcMask) ? 1 : 0;
+    USHORT flag1 = (bMask & bValue) ? 1 : 0;
+
+    flag ^= flag1;
+    hCrcBuf->crcState <<= 1;
+    if (flag) hCrcBuf->crcState ^= hCrcBuf->crcPoly;
   }
-  data->num_channels = num_channels;
-  data->delay = delay;
 
-  return 0;
+  return (hCrcBuf->crcState);
 }
 
-void FDK_Delay_Apply(FDK_SignalDelay* data, FIXP_PCM* time_buffer,
-                     const UINT frame_length, const UCHAR channel) {
-  FDK_ASSERT(data != NULL);
+/*!
+  \brief     crc
+*/
+static int getCrc(HANDLE_FDK_BITSTREAM hBs, ULONG NrBits) {
+  int i;
+  CRC_BUFFER CrcBuf;
 
-  if (data->delay > 0) {
-    C_ALLOC_SCRATCH_START(tmp, FIXP_PCM, MAX_FRAME_LENGTH)
-    FDK_ASSERT(frame_length <= MAX_FRAME_LENGTH);
-    FDK_ASSERT(channel < data->num_channels);
-    FDK_ASSERT(time_buffer != NULL);
-    if (frame_length >= data->delay) {
-      FDKmemcpy(tmp, &time_buffer[frame_length - data->delay],
-                data->delay * sizeof(FIXP_PCM));
-      FDKmemmove(&time_buffer[data->delay], &time_buffer[0],
-                 (frame_length - data->delay) * sizeof(FIXP_PCM));
-      FDKmemcpy(&time_buffer[0], &data->delay_line[channel * data->delay],
-                data->delay * sizeof(FIXP_PCM));
-      FDKmemcpy(&data->delay_line[channel * data->delay], tmp,
-                data->delay * sizeof(FIXP_PCM));
-    } else {
-      FDKmemcpy(tmp, &time_buffer[0], frame_length * sizeof(FIXP_PCM));
-      FDKmemcpy(&time_buffer[0], &data->delay_line[channel * data->delay],
-                frame_length * sizeof(FIXP_PCM));
-      FDKmemcpy(&data->delay_line[channel * data->delay],
-                &data->delay_line[channel * data->delay + frame_length],
-                (data->delay - frame_length) * sizeof(FIXP_PCM));
-      FDKmemcpy(&data->delay_line[channel * data->delay +
-                                  (data->delay - frame_length)],
-                tmp, frame_length * sizeof(FIXP_PCM));
-    }
-    C_ALLOC_SCRATCH_END(tmp, FIXP_PCM, MAX_FRAME_LENGTH)
+  CrcBuf.crcState = SBR_CRC_START;
+  CrcBuf.crcPoly = SBR_CRC_POLY;
+  CrcBuf.crcMask = SBR_CRC_MASK;
+
+  int CrcStep = NrBits >> MAXCRCSTEP_LD;
+
+  int CrcNrBitsRest = (NrBits - CrcStep * MAXCRCSTEP);
+  ULONG bValue;
+
+  for (i = 0; i < CrcStep; i++) {
+    bValue = FDKreadBits(hBs, MAXCRCSTEP);
+    calcCRC(&CrcBuf, bValue, MAXCRCSTEP);
   }
 
-  return;
+  bValue = FDKreadBits(hBs, CrcNrBitsRest);
+  calcCRC(&CrcBuf, bValue, CrcNrBitsRest);
+
+  return (CrcBuf.crcState & SBR_CRC_RANGE);
 }
 
-void FDK_Delay_Destroy(FDK_SignalDelay* data) {
-  if (data->delay_line != NULL) {
-    FDKfree(data->delay_line);
-  }
-  data->delay_line = NULL;
-  data->delay = 0;
-  data->num_channels = 0;
+/*!
+  \brief   crc interface
+  \return  1: CRC OK, 0: CRC check failure
+*/
+int SbrCrcCheck(HANDLE_FDK_BITSTREAM hBs, /*!< handle to bit-buffer  */
+                LONG NrBits)              /*!< max. CRC length       */
+{
+  int crcResult = 1;
+  ULONG NrCrcBits;
+  ULONG crcCheckResult;
+  LONG NrBitsAvailable;
+  ULONG crcCheckSum;
 
-  return;
+  crcCheckSum = FDKreadBits(hBs, 10);
+
+  NrBitsAvailable = FDKgetValidBits(hBs);
+  if (NrBitsAvailable <= 0) {
+    return 0;
+  }
+
+  NrCrcBits = fixMin((INT)NrBits, (INT)NrBitsAvailable);
+
+  crcCheckResult = getCrc(hBs, NrCrcBits);
+  FDKpushBack(hBs, (NrBitsAvailable - FDKgetValidBits(hBs)));
+
+  if (crcCheckResult != crcCheckSum) {
+    crcResult = 0;
+  }
+
+  return (crcResult);
 }
