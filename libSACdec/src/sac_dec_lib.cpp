@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -1507,17 +1507,15 @@ bail:
 }
 
 int mpegSurroundDecoder_Apply(CMpegSurroundDecoder *pMpegSurroundDecoder,
-                              PCM_MPS *input, PCM_MPS *pTimeData,
+                              INT_PCM *input, PCM_MPS *pTimeData,
                               const int timeDataSize, int timeDataFrameSize,
                               int *nChannels, int *frameSize, int sampleRate,
                               AUDIO_OBJECT_TYPE coreCodec,
                               AUDIO_CHANNEL_TYPE channelType[],
                               UCHAR channelIndices[],
-                              const FDK_channelMapDescr *const mapDescr,
-                              const INT inDataHeadroom, INT *outDataHeadroom) {
+                              const FDK_channelMapDescr *const mapDescr) {
   SACDEC_ERROR err = MPS_OK;
   PCM_MPS *pTimeOut = pTimeData;
-  PCM_MPS *TDinput = NULL;
   UINT initControlFlags = 0, controlFlags = 0;
   int timeDataRequiredSize = 0;
   int newData;
@@ -1535,9 +1533,6 @@ int mpegSurroundDecoder_Apply(CMpegSurroundDecoder *pMpegSurroundDecoder,
   if ((*nChannels <= 0) || (*nChannels > 2)) {
     return MPS_NOTOK;
   }
-
-  pMpegSurroundDecoder->pSpatialDec->sacInDataHeadroom = inDataHeadroom;
-  *outDataHeadroom = (INT)(8);
 
   pMpegSurroundDecoder->pSpatialDec->pConfigCurrent =
       &pMpegSurroundDecoder
@@ -1687,7 +1682,8 @@ int mpegSurroundDecoder_Apply(CMpegSurroundDecoder *pMpegSurroundDecoder,
         (timeDataFrameSize *
          pMpegSurroundDecoder->pQmfDomain->globalConf.nBandsSynthesis) /
         pMpegSurroundDecoder->pQmfDomain->globalConf.nBandsAnalysis;
-    TDinput = pTimeData + timeDataFrameSizeOut - timeDataFrameSize;
+    pMpegSurroundDecoder->pQmfDomain->globalConf.TDinput =
+        pTimeData + timeDataFrameSizeOut - timeDataFrameSize;
     for (int i = *nChannels - 1; i >= 0; i--) {
       FDKmemmove(pTimeData + (i + 1) * timeDataFrameSizeOut - timeDataFrameSize,
                  pTimeData + timeDataFrameSize * i,
@@ -1698,8 +1694,8 @@ int mpegSurroundDecoder_Apply(CMpegSurroundDecoder *pMpegSurroundDecoder,
   } else {
     if (pMpegSurroundDecoder->mpegSurroundUseTimeInterface) {
       FDKmemcpy(input, pTimeData,
-                sizeof(PCM_MPS) * (*nChannels) * (*frameSize));
-      TDinput = input;
+                sizeof(INT_PCM) * (*nChannels) * (*frameSize));
+      pMpegSurroundDecoder->pQmfDomain->globalConf.TDinput = input;
     }
   }
 
@@ -1711,8 +1707,8 @@ int mpegSurroundDecoder_Apply(CMpegSurroundDecoder *pMpegSurroundDecoder,
       &pMpegSurroundDecoder->bsFrames[pMpegSurroundDecoder->bsFrameDecode],
       pMpegSurroundDecoder->mpegSurroundUseTimeInterface ? INPUTMODE_TIME
                                                          : INPUTMODE_QMF_SBR,
-      TDinput, NULL, NULL, pTimeOut, *frameSize, &controlFlags, *nChannels,
-      mapDescr);
+      pMpegSurroundDecoder->pQmfDomain->globalConf.TDinput, NULL, NULL,
+      pTimeOut, *frameSize, &controlFlags, *nChannels, mapDescr);
   *nChannels = pMpegSurroundDecoder->pSpatialDec->numOutputChannelsAT;
 
   if (err !=
@@ -1785,7 +1781,7 @@ void mpegSurroundDecoder_Close(CMpegSurroundDecoder *pMpegSurroundDecoder) {
 }
 
 #define SACDEC_VL0 2
-#define SACDEC_VL1 1
+#define SACDEC_VL1 0
 #define SACDEC_VL2 0
 
 int mpegSurroundDecoder_GetLibInfo(LIB_INFO *info) {
