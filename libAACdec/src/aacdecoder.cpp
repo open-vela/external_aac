@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2020 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -234,8 +234,7 @@ void CAacDecoder_SyncQmfMode(HANDLE_AACDECODER self) {
               MODE_HQ))) { /* MPS decoder does support the requested mode. */
           break;
         }
-      }
-        FDK_FALLTHROUGH;
+      } /* Fall-through: */
       default:
         if (self->qmfModeUser == NOT_DEFINED) {
           /* Revert in case mpegSurroundDecoder_SetParam() fails. */
@@ -539,7 +538,13 @@ static int CProgramConfigElement_Read(HANDLE_FDK_BITSTREAM bs,
                     sizeof(CProgramConfig)); /* Store the complete PCE */
           pceStatus = 1; /* New PCE but no change of config */
           break;
-        case 2:  /* The number of channels are identical but not the config */
+        case 2: /* The number of channels are identical but not the config */
+          if (channelConfig == 0) {
+            FDKmemcpy(pce, tmpPce,
+                      sizeof(CProgramConfig)); /* Store the complete PCE */
+            pceStatus = 2; /* Decoder needs re-configuration */
+          }
+          break;
         case -1: /* The channel configuration is completely different */
           pceStatus = -1; /* Not supported! */
           break;
@@ -770,7 +775,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_PreRollExtensionPayloadParse(
     /* For every AU get length and offset in the bitstream */
     prerollAULength[i] = escapedValue(hBs, 16, 16, 0);
     if (prerollAULength[i] > 0) {
-      prerollAUOffset[i] = auStartAnchor - (INT)FDKgetValidBits(hBs);
+      prerollAUOffset[i] = auStartAnchor - FDKgetValidBits(hBs);
       independencyFlag = FDKreadBit(hBs);
       if (i == 0 && !independencyFlag) {
         *numPrerollAU = 0;
@@ -933,7 +938,6 @@ static AAC_DECODER_ERROR CAacDecoder_ExtPayloadParse(
 
     case EXT_SBR_DATA_CRC:
       crcFlag = 1;
-      FDK_FALLTHROUGH;
     case EXT_SBR_DATA:
       if (IS_CHANNEL_ELEMENT(previous_element)) {
         SBR_ERROR sbrError;
@@ -1072,7 +1076,6 @@ static AAC_DECODER_ERROR CAacDecoder_ExtPayloadParse(
          * intentional. */
         break;
       }
-      FDK_FALLTHROUGH;
 
     case EXT_FIL:
 
@@ -1105,13 +1108,12 @@ static AAC_DECODER_ERROR aacDecoder_ParseExplicitMpsAndSbr(
   /* get the remaining bits of this frame */
   bitCnt = transportDec_GetAuBitsRemaining(self->hInput, 0);
 
-  if ((self->flags[0] & AC_SBR_PRESENT) &&
+  if ((bitCnt > 0) && (self->flags[0] & AC_SBR_PRESENT) &&
       (self->flags[0] & (AC_USAC | AC_RSVD50 | AC_ELD | AC_DRM))) {
     SBR_ERROR err = SBRDEC_OK;
     int chElIdx, numChElements = el_cnt[ID_SCE] + el_cnt[ID_CPE] +
                                  el_cnt[ID_LFE] + el_cnt[ID_USAC_SCE] +
                                  el_cnt[ID_USAC_CPE] + el_cnt[ID_USAC_LFE];
-    INT bitCntTmp = bitCnt;
 
     if (self->flags[0] & AC_USAC) {
       chElIdx = numChElements - 1;
@@ -1121,7 +1123,6 @@ static AAC_DECODER_ERROR aacDecoder_ParseExplicitMpsAndSbr(
 
     for (; chElIdx < numChElements; chElIdx += 1) {
       MP4_ELEMENT_ID sbrType;
-      SBR_ERROR errTmp;
       if (self->flags[0] & (AC_USAC)) {
         FDK_ASSERT((self->elements[element_index] == ID_USAC_SCE) ||
                    (self->elements[element_index] == ID_USAC_CPE));
@@ -1131,21 +1132,19 @@ static AAC_DECODER_ERROR aacDecoder_ParseExplicitMpsAndSbr(
                       : ID_SCE;
       } else
         sbrType = self->elements[chElIdx];
-      errTmp = sbrDecoder_Parse(self->hSbrDecoder, bs, self->pDrmBsBuffer,
-                                self->drmBsBufferSize, &bitCnt, -1,
-                                self->flags[0] & AC_SBRCRC, sbrType, chElIdx,
-                                self->flags[0], self->elFlags);
-      if (errTmp != SBRDEC_OK) {
-        err = errTmp;
-        bitCntTmp = bitCnt;
-        bitCnt = 0;
+      err = sbrDecoder_Parse(self->hSbrDecoder, bs, self->pDrmBsBuffer,
+                             self->drmBsBufferSize, &bitCnt, -1,
+                             self->flags[0] & AC_SBRCRC, sbrType, chElIdx,
+                             self->flags[0], self->elFlags);
+      if (err != SBRDEC_OK) {
+        break;
       }
     }
     switch (err) {
       case SBRDEC_PARSE_ERROR:
         /* Can not go on parsing because we do not
             know the length of the SBR extension data. */
-        FDKpushFor(bs, bitCntTmp);
+        FDKpushFor(bs, bitCnt);
         bitCnt = 0;
         break;
       case SBRDEC_OK:
@@ -1225,8 +1224,6 @@ static void CStreamInfoInit(CStreamInfo *pStreamInfo) {
   pStreamInfo->drcProgRefLev =
       -1; /* set program reference level to not indicated */
   pStreamInfo->drcPresMode = -1; /* default: presentation mode not indicated */
-
-  pStreamInfo->outputLoudness = -1; /* default: no loudness metadata present */
 }
 
 /*!
@@ -1281,7 +1278,6 @@ LINKSPEC_CPP HANDLE_AACDECODER CAacDecoder_Open(
   /* Set default frame delay */
   aacDecoder_drcSetParam(self->hDrcInfo, DRC_BS_DELAY,
                          CConcealment_GetDelay(&self->concealCommonData));
-  self->workBufferCore1 = (FIXP_DBL *)GetWorkBufferCore1();
 
   self->workBufferCore2 = GetWorkBufferCore2();
   if (self->workBufferCore2 == NULL) goto bail;
@@ -1306,8 +1302,7 @@ static void CAacDecoder_DeInit(HANDLE_AACDECODER self,
                                const int subStreamIndex) {
   int ch;
   int aacChannelOffset = 0, aacChannels = (8);
-  int numElements = (3 * ((8) * 2) + (((8) * 2)) / 2 + 4 * (1) + 1),
-      elementOffset = 0;
+  int numElements = (((8)) + (8)), elementOffset = 0;
 
   if (self == NULL) return;
 
@@ -1457,10 +1452,6 @@ LINKSPEC_CPP void CAacDecoder_Close(HANDLE_AACDECODER self) {
     FreeDrcInfo(&self->hDrcInfo);
   }
 
-  if (self->workBufferCore1 != NULL) {
-    FreeWorkBufferCore1((CWorkBufferCore1 **)&self->workBufferCore1);
-  }
-
   /* Free WorkBufferCore2 */
   if (self->workBufferCore2 != NULL) {
     FreeWorkBufferCore2(&self->workBufferCore2);
@@ -1498,21 +1489,17 @@ CAacDecoder_Init(HANDLE_AACDECODER self, const CSAudioSpecificConfig *asc,
   UCHAR downscaleFactor = self->downscaleFactor;
   UCHAR downscaleFactorInBS = self->downscaleFactorInBS;
 
-  self->aacOutDataHeadroom = (3);
-
   // set profile and check for supported aot
   // leave profile on default (=-1) for all other supported MPEG-4 aot's except
   // aot=2 (=AAC-LC)
   switch (asc->m_aot) {
     case AOT_AAC_LC:
       self->streamInfo.profile = 1;
-      FDK_FALLTHROUGH;
     case AOT_ER_AAC_SCAL:
       if (asc->m_sc.m_gaSpecificConfig.m_layer > 0) {
         /* aac_scalable_extension_element() currently not supported. */
         return AAC_DEC_UNSUPPORTED_FORMAT;
       }
-      FDK_FALLTHROUGH;
     case AOT_SBR:
     case AOT_PS:
     case AOT_ER_AAC_LC:
@@ -1825,9 +1812,6 @@ CAacDecoder_Init(HANDLE_AACDECODER self, const CSAudioSpecificConfig *asc,
       self->useLdQmfTimeAlign =
           asc->m_sc.m_eldSpecificConfig.m_useLdQmfTimeAlign;
     }
-    if (self->sbrEnabled != asc->m_sbrPresentFlag) {
-      ascChanged = 1;
-    }
   }
 
   self->streamInfo.extAot = asc->m_extensionAudioObjectType;
@@ -1856,12 +1840,6 @@ CAacDecoder_Init(HANDLE_AACDECODER self, const CSAudioSpecificConfig *asc,
       self->streamInfo.extSamplingRate =
           self->streamInfo.extSamplingRate / self->downscaleFactor;
     }
-  }
-  if ((asc->m_aot == AOT_AAC_LC) && (asc->m_sbrPresentFlag == 1) &&
-      (asc->m_extensionSamplingFrequency > (2 * asc->m_samplingFrequency))) {
-    return AAC_DEC_UNSUPPORTED_SAMPLINGRATE; /* Core decoder supports at most a
-                                                1:2 upsampling for HE-AAC and
-                                                HE-AACv2 */
   }
 
   /* --------- vcb11 ------------ */
@@ -1944,9 +1922,6 @@ CAacDecoder_Init(HANDLE_AACDECODER self, const CSAudioSpecificConfig *asc,
           self->samplingRateInfo[0].samplingRate / self->downscaleFactor;
       self->streamInfo.aacSamplesPerFrame =
           asc->m_samplesPerFrame / self->downscaleFactor;
-      if (self->streamInfo.aacSampleRate <= 0) {
-        return AAC_DEC_UNSUPPORTED_SAMPLINGRATE;
-      }
     }
   }
 
@@ -2381,13 +2356,6 @@ CAacDecoder_Init(HANDLE_AACDECODER self, const CSAudioSpecificConfig *asc,
       goto bail;
   }
 
-  if (*configChanged) {
-    if (asc->m_aot == AOT_USAC) {
-      self->hDrcInfo->enable = 0;
-      self->hDrcInfo->progRefLevelPresent = 0;
-    }
-  }
-
   if (asc->m_aot == AOT_USAC) {
     pcmLimiter_SetAttack(self->hLimiter, (5));
     pcmLimiter_SetThreshold(self->hLimiter, FL2FXCONST_DBL(0.89125094f));
@@ -2401,7 +2369,7 @@ bail:
 }
 
 LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
-    HANDLE_AACDECODER self, const UINT flags, PCM_DEC *pTimeData,
+    HANDLE_AACDECODER self, const UINT flags, FIXP_PCM *pTimeData,
     const INT timeDataSize, const int timeDataChannelOffset) {
   AAC_DECODER_ERROR ErrorStatus = AAC_DEC_OK;
 
@@ -3056,11 +3024,9 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
     aacChannels = 0;
   }
 
-  if (!(flags & (AACDEC_CONCEAL | AACDEC_FLUSH))) {
-    if (TRANSPORTDEC_OK != transportDec_CrcCheck(self->hInput)) {
-      ErrorStatus = AAC_DEC_CRC_ERROR;
-      self->frameOK = 0;
-    }
+  if (TRANSPORTDEC_OK != transportDec_CrcCheck(self->hInput)) {
+    ErrorStatus = AAC_DEC_CRC_ERROR;
+    self->frameOK = 0;
   }
 
   /* Ensure that in case of concealment a proper error status is set. */
@@ -3177,6 +3143,11 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
       FDKmemcpy(drcChMap, self->chMapping, (8) * sizeof(UCHAR));
     }
 
+    /* Turn on/off DRC modules level normalization in digital domain depending
+     * on the limiter status. */
+    aacDecoder_drcSetParam(self->hDrcInfo, APPLY_NORMALIZATION,
+                           (self->limiterEnableCurr) ? 0 : 1);
+
     /* deactivate legacy DRC in case uniDrc is active, i.e. uniDrc payload is
      * present and one of DRC or Loudness Normalization is switched on */
     aacDecoder_drcSetParam(
@@ -3189,15 +3160,9 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
         self->hDrcInfo, bs, self->pAacDecoderStaticChannelInfo,
         pce->ElementInstanceTag, drcChMap, aacChannels);
     if (mapped > 0) {
-      if (!(self->flags[streamIndex] & (AC_USAC | AC_RSV603DA))) {
-        /* If at least one DRC thread has been mapped to a channel there was DRC
-         * data in the bitstream. */
-        self->flags[streamIndex] |= AC_DRC_PRESENT;
-      } else {
-        self->hDrcInfo->enable = 0;
-        self->hDrcInfo->progRefLevelPresent = 0;
-        ErrorStatus = AAC_DEC_UNSUPPORTED_FORMAT;
-      }
+      /* If at least one DRC thread has been mapped to a channel threre was DRC
+       * data in the bitstream. */
+      self->flags[streamIndex] |= AC_DRC_PRESENT;
     }
 
     /* Create a reverse mapping table */
@@ -3327,11 +3292,9 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
                 &pAacDecoderStaticChannelInfo->drcData);
           }
         }
-
         /* The DRC module demands to be called with the gain field holding the
          * gain scale. */
-        self->extGain[0] = (FIXP_DBL)AACDEC_DRC_GAIN_SCALING;
-
+        self->extGain[0] = (FIXP_DBL)TDL_GAIN_SCALING;
         /* DRC processing */
         aacDecoder_drcApply(
             self->hDrcInfo, self->hSbrDecoder, pAacDecoderChannelInfo,
@@ -3347,7 +3310,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
         if (self->flushStatus && (self->flushCnt > 0) &&
             !(flags & AACDEC_CONCEAL)) {
           FDKmemclear(pTimeData + offset,
-                      sizeof(PCM_DEC) * self->streamInfo.aacSamplesPerFrame);
+                      sizeof(FIXP_PCM) * self->streamInfo.aacSamplesPerFrame);
         } else
           switch (pAacDecoderChannelInfo->renderMode) {
             case AACDEC_RENDER_IMDCT:
@@ -3359,7 +3322,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
                    !frameOk_butConceal),
                   pAacDecoderChannelInfo->pComStaticData->pWorkBufferCore1
                       ->mdctOutTemp,
-                  self->aacOutDataHeadroom, self->elFlags[el], elCh);
+                  self->elFlags[el], elCh);
 
               self->extGainDelay = self->streamInfo.aacSamplesPerFrame;
               break;
@@ -3380,7 +3343,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
                   &self->samplingRateInfo[streamIndex],
                   (self->frameOK && !(flags & AACDEC_CONCEAL) &&
                    !frameOk_butConceal),
-                  self->aacOutDataHeadroom, flags, self->flags[streamIndex]);
+                  flags, self->flags[streamIndex]);
 
               self->extGainDelay = self->streamInfo.aacSamplesPerFrame;
               break;
@@ -3392,8 +3355,7 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
         if (!CConceal_TDFading_Applied[c]) {
           CConceal_TDFading_Applied[c] = CConcealment_TDFading(
               self->streamInfo.aacSamplesPerFrame,
-              &self->pAacDecoderStaticChannelInfo[c], self->aacOutDataHeadroom,
-              pTimeData + offset, 0);
+              &self->pAacDecoderStaticChannelInfo[c], pTimeData + offset, 0);
           if (c + 1 < (8) && c < aacChannels - 1) {
             /* update next TDNoise Seed to avoid muting in case of Parametric
              * Stereo */
@@ -3415,17 +3377,22 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
       if ((aacChannels == 2) && bsPseudoLr) {
         int i, offset2;
         const FIXP_SGL invSqrt2 = FL2FXCONST_SGL(0.707106781186547f);
-        PCM_DEC *pTD = pTimeData;
+        FIXP_PCM *pTD = pTimeData;
 
         offset2 = timeDataChannelOffset;
 
         for (i = 0; i < self->streamInfo.aacSamplesPerFrame; i++) {
-          FIXP_DBL L = PCM_DEC2FIXP_DBL(pTD[0]);
-          FIXP_DBL R = PCM_DEC2FIXP_DBL(pTD[offset2]);
+          FIXP_DBL L = FX_PCM2FX_DBL(pTD[0]);
+          FIXP_DBL R = FX_PCM2FX_DBL(pTD[offset2]);
           L = fMult(L, invSqrt2);
           R = fMult(R, invSqrt2);
-          pTD[0] = L + R;
-          pTD[offset2] = L - R;
+#if (SAMPLE_BITS == 16)
+          pTD[0] = FX_DBL2FX_PCM(fAddSaturate(L + R, (FIXP_DBL)0x8000));
+          pTD[offset2] = FX_DBL2FX_PCM(fAddSaturate(L - R, (FIXP_DBL)0x8000));
+#else
+          pTD[0] = FX_DBL2FX_PCM(L + R);
+          pTD[offset2] = FX_DBL2FX_PCM(L - R);
+#endif
           pTD++;
         }
       }
@@ -3436,15 +3403,9 @@ LINKSPEC_CPP AAC_DECODER_ERROR CAacDecoder_DecodeFrame(
         self->hDrcInfo, bs, self->pAacDecoderStaticChannelInfo,
         pce->ElementInstanceTag, drcChMap, aacChannels);
     if (mapped > 0) {
-      if (!(self->flags[streamIndex] & (AC_USAC | AC_RSV603DA))) {
-        /* If at least one DRC thread has been mapped to a channel there was DRC
-         * data in the bitstream. */
-        self->flags[streamIndex] |= AC_DRC_PRESENT;
-      } else {
-        self->hDrcInfo->enable = 0;
-        self->hDrcInfo->progRefLevelPresent = 0;
-        ErrorStatus = AAC_DEC_UNSUPPORTED_FORMAT;
-      }
+      /* If at least one DRC thread has been mapped to a channel threre was DRC
+       * data in the bitstream. */
+      self->flags[streamIndex] |= AC_DRC_PRESENT;
     }
   }
 

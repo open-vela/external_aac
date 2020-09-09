@@ -212,7 +212,6 @@ static INT getPceRepetitionRate(const CHANNEL_MODE channelMode,
                                                  for potential matrix mixdown */
               break;
             }
-            FDK_FALLTHROUGH;
           case TT_MP4_LOAS:      /* PCE in ASC if chChonfig==0 */
           case TT_MP4_LATM_MCP1: /* PCE in ASC if chChonfig==0 */
           default:
@@ -647,7 +646,7 @@ TRANSPORTENC_ERROR transportEnc_GetLibInfo(LIB_INFO *info) {
   info->module_id = FDK_TPENC;
   info->version = LIB_VERSION(TP_LIB_VL0, TP_LIB_VL1, TP_LIB_VL2);
   LIB_VERSION_STRING(info);
-#ifdef SUPPRESS_BUILD_DATE_INFO
+#ifdef __ANDROID__
   info->build_date = "";
   info->build_time = "";
 #else

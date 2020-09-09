@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -112,7 +112,7 @@ amm-info@iis.fraunhofer.de
 #define DRCDEC_LIB_VL1 1
 #define DRCDEC_LIB_VL2 0
 #define DRCDEC_LIB_TITLE "MPEG-D DRC Decoder Lib"
-#ifdef SUPPRESS_BUILD_DATE_INFO
+#ifdef __ANDROID__
 #define DRCDEC_LIB_BUILD_DATE ""
 #define DRCDEC_LIB_BUILD_TIME ""
 #else
@@ -145,10 +145,6 @@ struct s_drc_decoder {
   SEL_PROC_OUTPUT selProcOutput;
 } DRC_DECODER;
 
-static int _getGainStatus(HANDLE_UNI_DRC_GAIN hUniDrcGain) {
-  return hUniDrcGain->status;
-}
-
 static int isResetNeeded(HANDLE_DRC_DECODER hDrcDec,
                          const SEL_PROC_OUTPUT oldSelProcOutput) {
   int i, resetNeeded = 0;
@@ -177,11 +173,13 @@ static int isResetNeeded(HANDLE_DRC_DECODER hDrcDec,
   return resetNeeded;
 }
 
-static void startSelectionProcess(HANDLE_DRC_DECODER hDrcDec) {
+static DRC_DEC_ERROR startSelectionProcess(HANDLE_DRC_DECODER hDrcDec) {
+  DRC_ERROR dErr = DE_OK;
+  DRCDEC_SELECTION_PROCESS_RETURN sErr = DRCDEC_SELECTION_PROCESS_NO_ERROR;
   int uniDrcConfigHasChanged = 0;
   SEL_PROC_OUTPUT oldSelProcOutput = hDrcDec->selProcOutput;
 
-  if (!hDrcDec->status) return;
+  if (!hDrcDec->status) return DRC_DEC_NOT_READY;
 
   if (hDrcDec->functionalRange & DRC_DEC_SELECTION) {
     uniDrcConfigHasChanged = hDrcDec->uniDrcConfig.diff;
@@ -191,9 +189,10 @@ static void startSelectionProcess(HANDLE_DRC_DECODER hDrcDec) {
        */
       hDrcDec->selProcOutput.numSelectedDrcSets = 0;
 
-      drcDec_SelectionProcess_Process(
+      sErr = drcDec_SelectionProcess_Process(
           hDrcDec->hSelectionProc, &(hDrcDec->uniDrcConfig),
           &(hDrcDec->loudnessInfoSet), &(hDrcDec->selProcOutput));
+      if (sErr) return DRC_DEC_OK;
 
       hDrcDec->selProcInputDiff = 0;
       hDrcDec->uniDrcConfig.diff = 0;
@@ -203,12 +202,15 @@ static void startSelectionProcess(HANDLE_DRC_DECODER hDrcDec) {
 
   if (hDrcDec->functionalRange & DRC_DEC_GAIN) {
     if (isResetNeeded(hDrcDec, oldSelProcOutput) || uniDrcConfigHasChanged) {
-      drcDec_GainDecoder_Config(hDrcDec->hGainDec, &(hDrcDec->uniDrcConfig),
-                                hDrcDec->selProcOutput.numSelectedDrcSets,
-                                hDrcDec->selProcOutput.selectedDrcSetIds,
-                                hDrcDec->selProcOutput.selectedDownmixIds);
+      dErr =
+          drcDec_GainDecoder_Config(hDrcDec->hGainDec, &(hDrcDec->uniDrcConfig),
+                                    hDrcDec->selProcOutput.numSelectedDrcSets,
+                                    hDrcDec->selProcOutput.selectedDrcSetIds,
+                                    hDrcDec->selProcOutput.selectedDownmixIds);
+      if (dErr) return DRC_DEC_OK;
     }
   }
+  return DRC_DEC_OK;
 }
 
 DRC_DEC_ERROR
@@ -340,13 +342,7 @@ FDK_drcDec_Init(HANDLE_DRC_DECODER hDrcDec, const int frameSize,
   }
 
   if (hDrcDec->functionalRange & DRC_DEC_GAIN) {
-    dErr = drcDec_GainDecoder_SetParam(hDrcDec->hGainDec, GAIN_DEC_FRAME_SIZE,
-                                       frameSize);
-    if (dErr) return DRC_DEC_NOT_OK;
-    dErr = drcDec_GainDecoder_SetParam(hDrcDec->hGainDec, GAIN_DEC_SAMPLE_RATE,
-                                       sampleRate);
-    if (dErr) return DRC_DEC_NOT_OK;
-    dErr = drcDec_GainDecoder_Init(hDrcDec->hGainDec);
+    dErr = drcDec_GainDecoder_Init(hDrcDec->hGainDec, frameSize, sampleRate);
     if (dErr) return DRC_DEC_NOT_OK;
   }
 
@@ -387,98 +383,72 @@ DRC_DEC_ERROR
 FDK_drcDec_SetParam(HANDLE_DRC_DECODER hDrcDec,
                     const DRC_DEC_USERPARAM requestType,
                     const FIXP_DBL requestValue) {
-  DRC_ERROR dErr = DE_OK;
   DRCDEC_SELECTION_PROCESS_RETURN sErr = DRCDEC_SELECTION_PROCESS_NO_ERROR;
-  int invalidParameter = 0;
 
   if (hDrcDec == NULL) return DRC_DEC_NOT_OPENED;
 
-  if (hDrcDec->functionalRange & DRC_DEC_GAIN) {
-    switch (requestType) {
-      case DRC_DEC_SAMPLE_RATE:
-        dErr = drcDec_GainDecoder_SetParam(
-            hDrcDec->hGainDec, GAIN_DEC_SAMPLE_RATE, (int)requestValue);
-        if (dErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
-        break;
-      case DRC_DEC_FRAME_SIZE:
-        dErr = drcDec_GainDecoder_SetParam(
-            hDrcDec->hGainDec, GAIN_DEC_FRAME_SIZE, (int)requestValue);
-        if (dErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
-        break;
-      default:
-        invalidParameter |= DRC_DEC_GAIN;
-    }
-  }
+  if (hDrcDec->functionalRange == DRC_DEC_GAIN)
+    return DRC_DEC_NOT_OK; /* not supported for DRC_DEC_GAIN. All parameters are
+                              handed over to selection process lib. */
 
-  if (hDrcDec->functionalRange & DRC_DEC_SELECTION) {
-    switch (requestType) {
-      case DRC_DEC_BOOST:
-        sErr = drcDec_SelectionProcess_SetParam(hDrcDec->hSelectionProc,
-                                                SEL_PROC_BOOST, requestValue,
-                                                &(hDrcDec->selProcInputDiff));
-        if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
-        break;
-      case DRC_DEC_COMPRESS:
-        sErr = drcDec_SelectionProcess_SetParam(hDrcDec->hSelectionProc,
-                                                SEL_PROC_COMPRESS, requestValue,
-                                                &(hDrcDec->selProcInputDiff));
-        if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
-        break;
-      case DRC_DEC_LOUDNESS_NORMALIZATION_ON:
-        sErr = drcDec_SelectionProcess_SetParam(
-            hDrcDec->hSelectionProc, SEL_PROC_LOUDNESS_NORMALIZATION_ON,
-            requestValue, &(hDrcDec->selProcInputDiff));
-        if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
-        break;
-      case DRC_DEC_TARGET_LOUDNESS:
-        sErr = drcDec_SelectionProcess_SetParam(
-            hDrcDec->hSelectionProc, SEL_PROC_TARGET_LOUDNESS, requestValue,
-            &(hDrcDec->selProcInputDiff));
-        if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
-        break;
-      case DRC_DEC_EFFECT_TYPE:
-        sErr = drcDec_SelectionProcess_SetParam(
-            hDrcDec->hSelectionProc, SEL_PROC_EFFECT_TYPE, requestValue,
-            &(hDrcDec->selProcInputDiff));
-        if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
-        break;
-      case DRC_DEC_DOWNMIX_ID:
-        sErr = drcDec_SelectionProcess_SetParam(
-            hDrcDec->hSelectionProc, SEL_PROC_DOWNMIX_ID, requestValue,
-            &(hDrcDec->selProcInputDiff));
-        if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
-        break;
-      case DRC_DEC_TARGET_CHANNEL_COUNT_REQUESTED:
-        sErr = drcDec_SelectionProcess_SetParam(
-            hDrcDec->hSelectionProc, SEL_PROC_TARGET_CHANNEL_COUNT,
-            requestValue, &(hDrcDec->selProcInputDiff));
-        if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
-        break;
-      case DRC_DEC_BASE_CHANNEL_COUNT:
-        sErr = drcDec_SelectionProcess_SetParam(
-            hDrcDec->hSelectionProc, SEL_PROC_BASE_CHANNEL_COUNT, requestValue,
-            &(hDrcDec->selProcInputDiff));
-        if (sErr) return DRC_DEC_NOT_OK;
-        break;
-      case DRC_DEC_LOUDNESS_MEASUREMENT_METHOD:
-        sErr = drcDec_SelectionProcess_SetParam(
-            hDrcDec->hSelectionProc, SEL_PROC_LOUDNESS_MEASUREMENT_METHOD,
-            requestValue, &(hDrcDec->selProcInputDiff));
-        if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
-        break;
-      case DRC_DEC_ALBUM_MODE:
-        sErr = drcDec_SelectionProcess_SetParam(
-            hDrcDec->hSelectionProc, SEL_PROC_ALBUM_MODE, requestValue,
-            &(hDrcDec->selProcInputDiff));
-        if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
-        break;
-      default:
-        invalidParameter |= DRC_DEC_SELECTION;
-    }
+  switch (requestType) {
+    case DRC_DEC_BOOST:
+      sErr = drcDec_SelectionProcess_SetParam(hDrcDec->hSelectionProc,
+                                              SEL_PROC_BOOST, requestValue,
+                                              &(hDrcDec->selProcInputDiff));
+      if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
+      break;
+    case DRC_DEC_COMPRESS:
+      sErr = drcDec_SelectionProcess_SetParam(hDrcDec->hSelectionProc,
+                                              SEL_PROC_COMPRESS, requestValue,
+                                              &(hDrcDec->selProcInputDiff));
+      if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
+      break;
+    case DRC_DEC_LOUDNESS_NORMALIZATION_ON:
+      sErr = drcDec_SelectionProcess_SetParam(
+          hDrcDec->hSelectionProc, SEL_PROC_LOUDNESS_NORMALIZATION_ON,
+          requestValue, &(hDrcDec->selProcInputDiff));
+      if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
+      break;
+    case DRC_DEC_TARGET_LOUDNESS:
+      sErr = drcDec_SelectionProcess_SetParam(
+          hDrcDec->hSelectionProc, SEL_PROC_TARGET_LOUDNESS, requestValue,
+          &(hDrcDec->selProcInputDiff));
+      if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
+      break;
+    case DRC_DEC_EFFECT_TYPE:
+      sErr = drcDec_SelectionProcess_SetParam(
+          hDrcDec->hSelectionProc, SEL_PROC_EFFECT_TYPE, requestValue,
+          &(hDrcDec->selProcInputDiff));
+      if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
+      break;
+    case DRC_DEC_DOWNMIX_ID:
+      sErr = drcDec_SelectionProcess_SetParam(hDrcDec->hSelectionProc,
+                                              SEL_PROC_DOWNMIX_ID, requestValue,
+                                              &(hDrcDec->selProcInputDiff));
+      if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
+      break;
+    case DRC_DEC_TARGET_CHANNEL_COUNT_REQUESTED:
+      sErr = drcDec_SelectionProcess_SetParam(
+          hDrcDec->hSelectionProc, SEL_PROC_TARGET_CHANNEL_COUNT, requestValue,
+          &(hDrcDec->selProcInputDiff));
+      if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
+      break;
+    case DRC_DEC_BASE_CHANNEL_COUNT:
+      sErr = drcDec_SelectionProcess_SetParam(
+          hDrcDec->hSelectionProc, SEL_PROC_BASE_CHANNEL_COUNT, requestValue,
+          &(hDrcDec->selProcInputDiff));
+      if (sErr) return DRC_DEC_NOT_OK;
+      break;
+    case DRC_DEC_LOUDNESS_MEASUREMENT_METHOD:
+      sErr = drcDec_SelectionProcess_SetParam(
+          hDrcDec->hSelectionProc, SEL_PROC_LOUDNESS_MEASUREMENT_METHOD,
+          requestValue, &(hDrcDec->selProcInputDiff));
+      if (sErr) return DRC_DEC_PARAM_OUT_OF_RANGE;
+      break;
+    default:
+      return DRC_DEC_INVALID_PARAM;
   }
-
-  if (invalidParameter == hDrcDec->functionalRange)
-    return DRC_DEC_INVALID_PARAM;
 
   /* All parameters need a new start of the selection process */
   startSelectionProcess(hDrcDec);
@@ -519,8 +489,6 @@ LONG FDK_drcDec_GetParam(HANDLE_DRC_DECODER hDrcDec,
     }
     case DRC_DEC_TARGET_CHANNEL_COUNT_SELECTED:
       return (LONG)hDrcDec->selProcOutput.targetChannelCount;
-    case DRC_DEC_OUTPUT_LOUDNESS:
-      return (LONG)hDrcDec->selProcOutput.outputLoudness;
     default:
       return 0;
   }
@@ -735,9 +703,7 @@ FDK_drcDec_ReadUniDrcGain(HANDLE_DRC_DECODER hDrcDec,
       &(hDrcDec->uniDrcGain));
   if (dErr) return DRC_DEC_NOT_OK;
 
-  if (_getGainStatus(&(hDrcDec->uniDrcGain))) {
-    hDrcDec->status = DRC_DEC_NEW_GAIN_PAYLOAD;
-  }
+  hDrcDec->status = DRC_DEC_NEW_GAIN_PAYLOAD;
 
   return DRC_DEC_OK;
 }
@@ -755,13 +721,11 @@ FDK_drcDec_ReadUniDrc(HANDLE_DRC_DECODER hDrcDec,
       drcDec_GainDecoder_GetFrameSize(hDrcDec->hGainDec),
       drcDec_GainDecoder_GetDeltaTminDefault(hDrcDec->hGainDec),
       &(hDrcDec->uniDrcGain));
-
-  startSelectionProcess(hDrcDec);
   if (dErr) return DRC_DEC_NOT_OK;
 
-  if (_getGainStatus(&(hDrcDec->uniDrcGain))) {
-    hDrcDec->status = DRC_DEC_NEW_GAIN_PAYLOAD;
-  }
+  startSelectionProcess(hDrcDec);
+
+  hDrcDec->status = DRC_DEC_NEW_GAIN_PAYLOAD;
 
   return DRC_DEC_OK;
 }

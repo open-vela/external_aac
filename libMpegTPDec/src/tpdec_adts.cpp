@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2020 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -180,11 +180,7 @@ TRANSPORTDEC_ERROR adtsRead_DecodeHeader(HANDLE_ADTS pAdts,
      have channelConfig=0 and no PCE in this frame. */
   FDKmemcpy(&oldPce, &pAsc->m_progrConfigElement, sizeof(CProgramConfig));
 
-  valBits = FDKgetValidBits(hBs) + ADTS_SYNCLENGTH;
-
-  if (valBits < ADTS_HEADERLENGTH) {
-    return TRANSPORTDEC_NOT_ENOUGH_BITS;
-  }
+  valBits = FDKgetValidBits(hBs);
 
   /* adts_fixed_header */
   bs.mpeg_id = FDKreadBits(hBs, Adts_Length_Id);
@@ -209,21 +205,14 @@ TRANSPORTDEC_ERROR adtsRead_DecodeHeader(HANDLE_ADTS pAdts,
 
   adtsHeaderLength = ADTS_HEADERLENGTH;
 
-  if (valBits < bs.frame_length * 8) {
-    goto bail;
-  }
-
-  FDKcrcReset(&pAdts->crcInfo);
   if (!bs.protection_absent) {
+    FDKcrcReset(&pAdts->crcInfo);
     FDKpushBack(hBs, 56); /* complete fixed and variable header! */
     crcReg = FDKcrcStartReg(&pAdts->crcInfo, hBs, 0);
     FDKpushFor(hBs, 56);
   }
 
   if (!bs.protection_absent && bs.num_raw_blocks > 0) {
-    if ((INT)FDKgetValidBits(hBs) < bs.num_raw_blocks * 16) {
-      goto bail;
-    }
     for (i = 0; i < bs.num_raw_blocks; i++) {
       pAdts->rawDataBlockDist[i] = (USHORT)FDKreadBits(hBs, 16);
       adtsHeaderLength += 16;
@@ -241,11 +230,6 @@ TRANSPORTDEC_ERROR adtsRead_DecodeHeader(HANDLE_ADTS pAdts,
     USHORT crc_check;
 
     FDKcrcEndReg(&pAdts->crcInfo, hBs, crcReg);
-
-    if ((INT)FDKgetValidBits(hBs) < Adts_Length_CrcCheck) {
-      goto bail;
-    }
-
     crc_check = FDKreadBits(hBs, Adts_Length_CrcCheck);
     adtsHeaderLength += Adts_Length_CrcCheck;
 
@@ -314,55 +298,15 @@ TRANSPORTDEC_ERROR adtsRead_DecodeHeader(HANDLE_ADTS pAdts,
   if (bs.channel_config == 0) {
     int pceBits = 0;
     UINT alignAnchor = FDKgetValidBits(hBs);
-    CProgramConfig tmpPce;
 
     if (FDKreadBits(hBs, 3) == ID_PCE) {
       /* Got luck! Parse the PCE */
       crcReg = adtsRead_CrcStartReg(pAdts, hBs, 0);
 
-      CProgramConfig_Init(&tmpPce);
-      CProgramConfig_Read(&tmpPce, hBs, alignAnchor);
-
-      if (CProgramConfig_IsValid(&tmpPce)) {
-        if (CProgramConfig_IsValid(&oldPce)) {
-          /* Compare the new and the old PCE (tags ignored) */
-          switch (CProgramConfig_Compare(&tmpPce, &oldPce)) {
-            case 0: /* Nothing to do because PCE matches the old one exactly. */
-            case 1: /* Channel configuration not changed. Just new metadata. */
-              FDKmemcpy(&pAsc->m_progrConfigElement, &tmpPce,
-                        sizeof(CProgramConfig));
-              break;
-            case 2:  /* The number of channels are identical but not the config
-                      */
-            case -1: /* The channel configuration is completely different */
-            default:
-              FDKmemcpy(&pAsc->m_progrConfigElement, &oldPce,
-                        sizeof(CProgramConfig));
-              FDKpushBack(hBs, adtsHeaderLength);
-              return TRANSPORTDEC_PARSE_ERROR;
-          }
-        } else {
-          FDKmemcpy(&pAsc->m_progrConfigElement, &tmpPce,
-                    sizeof(CProgramConfig));
-        }
-      } else {
-        if (CProgramConfig_IsValid(&oldPce)) {
-          FDKmemcpy(&pAsc->m_progrConfigElement, &oldPce,
-                    sizeof(CProgramConfig));
-        } else {
-          FDKpushBack(hBs, adtsHeaderLength);
-          return TRANSPORTDEC_PARSE_ERROR;
-        }
-      }
+      CProgramConfig_Read(&pAsc->m_progrConfigElement, hBs, alignAnchor);
 
       adtsRead_CrcEndReg(pAdts, hBs, crcReg);
-      pceBits = (INT)alignAnchor - (INT)FDKgetValidBits(hBs);
-      adtsHeaderLength += pceBits;
-
-      if (pceBits > (INT)alignAnchor) {
-        goto bail;
-      }
-
+      pceBits = alignAnchor - FDKgetValidBits(hBs);
       /* store the number of PCE bits */
       bs.num_pce_bits = pceBits;
     } else {
@@ -399,10 +343,6 @@ TRANSPORTDEC_ERROR adtsRead_DecodeHeader(HANDLE_ADTS pAdts,
   FDKmemcpy(&pAdts->bs, &bs, sizeof(STRUCT_ADTS_BS));
 
   return TRANSPORTDEC_OK;
-
-bail:
-  FDKpushBack(hBs, adtsHeaderLength);
-  return TRANSPORTDEC_NOT_ENOUGH_BITS;
 }
 
 int adtsRead_GetRawDataBlockLength(HANDLE_ADTS pAdts, INT blockNum) {
