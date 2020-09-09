@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -132,9 +132,6 @@ typedef enum {
 } KEEP_STATES_SYNCED_MODE;
 
 struct hbeTransposer {
-  FIXP_DBL anaQmfStates[HBE_QMF_FILTER_STATE_ANA_SIZE];
-  FIXP_QSS synQmfStates[HBE_QMF_FILTER_STATE_SYN_SIZE];
-
   int xOverQmf[MAX_NUM_PATCHES_HBE];
 
   int maxStretch;
@@ -147,7 +144,7 @@ struct hbeTransposer {
   int stopBand;
   int bSbr41;
 
-  LONG *inBuf_F;
+  INT_PCM *inBuf_F;
   FIXP_DBL **qmfInBufReal_F;
   FIXP_DBL **qmfInBufImag_F;
 
@@ -158,6 +155,9 @@ struct hbeTransposer {
 
   FIXP_DBL const *synthesisQmfPreModCos_F;
   FIXP_DBL const *synthesisQmfPreModSin_F;
+
+  FIXP_QAS anaQmfStates[HBE_QMF_FILTER_STATE_ANA_SIZE];
+  FIXP_QSS synQmfStates[HBE_QMF_FILTER_STATE_SYN_SIZE];
 
   FIXP_DBL **qmfHBEBufReal_F;
   FIXP_DBL **qmfHBEBufImag_F;
