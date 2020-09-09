@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -185,22 +185,17 @@ drcDec_readUniDrc(HANDLE_FDK_BITSTREAM hBs, HANDLE_UNI_DRC_CONFIG hUniDrcConfig,
     uniDrcConfigPresent = FDKreadBits(hBs, 1);
     if (uniDrcConfigPresent) {
       err = drcDec_readUniDrcConfig(hBs, hUniDrcConfig);
-      if (err) {
-        /* clear config, if parsing error occured */
-        FDKmemclear(hUniDrcConfig, sizeof(UNI_DRC_CONFIG));
-        hUniDrcConfig->diff = 1;
-      }
+      if (err) return err;
     }
     err = drcDec_readLoudnessInfoSet(hBs, hLoudnessInfoSet);
-    if (err) {
-      /* clear config, if parsing error occured */
-      FDKmemclear(hLoudnessInfoSet, sizeof(LOUDNESS_INFO_SET));
-      hLoudnessInfoSet->diff = 1;
-    }
+    if (err) return err;
   }
 
-  err = drcDec_readUniDrcGain(hBs, hUniDrcConfig, frameSize, deltaTminDefault,
-                              hUniDrcGain);
+  if (hUniDrcGain != NULL) {
+    err = drcDec_readUniDrcGain(hBs, hUniDrcConfig, frameSize, deltaTminDefault,
+                                hUniDrcGain);
+    if (err) return err;
+  }
 
   return err;
 }
@@ -484,13 +479,10 @@ drcDec_readUniDrcGain(HANDLE_FDK_BITSTREAM hBs,
   int seq, gainSequenceCount;
   DRC_COEFFICIENTS_UNI_DRC* pCoef =
       selectDrcCoefficients(hUniDrcConfig, LOCATION_SELECTED);
-  if (hUniDrcGain == NULL) return DE_NOT_OK;
-  hUniDrcGain->status = 0;
-  if (pCoef) {
-    gainSequenceCount = fMin(pCoef->gainSequenceCount, (UCHAR)12);
-  } else {
-    gainSequenceCount = 0;
-  }
+  if (pCoef == NULL) return DE_OK;
+  if (hUniDrcGain == NULL) return DE_OK; /* hUniDrcGain not initialized yet */
+
+  gainSequenceCount = fMin(pCoef->gainSequenceCount, (UCHAR)12);
 
   for (seq = 0; seq < gainSequenceCount; seq++) {
     UCHAR index = pCoef->gainSetIndexForGainSequence[seq];
@@ -518,9 +510,6 @@ drcDec_readUniDrcGain(HANDLE_FDK_BITSTREAM hBs,
     if (err) return err;
   }
 
-  if (err == DE_OK && gainSequenceCount > 0) {
-    hUniDrcGain->status = 1;
-  }
   return err;
 }
 
@@ -1021,7 +1010,6 @@ static DRC_ERROR _skipEqInstructions(HANDLE_FDK_BITSTREAM hBs,
   int additionalDrcSetIdPresent, additionalDrcSetIdCount;
   int dependsOnEqSetPresent, eqChannelGroupCount, tdFilterCascadePresent,
       subbandGainsPresent, eqTransitionDurationPresent;
-  UCHAR eqChannelGroupForChannel[8];
 
   FDKpushFor(hBs, 6); /* eqSetId */
   FDKpushFor(hBs, 4); /* eqSetComplexityLevel */
@@ -1071,6 +1059,7 @@ static DRC_ERROR _skipEqInstructions(HANDLE_FDK_BITSTREAM hBs,
 
   eqChannelGroupCount = 0;
   for (c = 0; c < channelCount; c++) {
+    UCHAR eqChannelGroupForChannel[8];
     int newGroup = 1;
     if (c >= 8) return DE_MEMORY_ERROR;
     eqChannelGroupForChannel[c] = FDKreadBits(hBs, 7);
@@ -1141,7 +1130,7 @@ static DRC_ERROR _readDrcCoefficientsUniDrc(HANDLE_FDK_BITSTREAM hBs,
     drcCharacteristicLeftPresent = FDKreadBits(hBs, 1);
     if (drcCharacteristicLeftPresent) {
       pCoef->characteristicLeftCount = FDKreadBits(hBs, 4);
-      if ((pCoef->characteristicLeftCount + 1) > 16) return DE_MEMORY_ERROR;
+      if ((pCoef->characteristicLeftCount + 1) > 8) return DE_MEMORY_ERROR;
       for (i = 0; i < pCoef->characteristicLeftCount; i++) {
         err = _readCustomDrcCharacteristic(
             hBs, CS_LEFT, &(pCoef->characteristicLeftFormat[i + 1]),
@@ -1152,7 +1141,7 @@ static DRC_ERROR _readDrcCoefficientsUniDrc(HANDLE_FDK_BITSTREAM hBs,
     drcCharacteristicRightPresent = FDKreadBits(hBs, 1);
     if (drcCharacteristicRightPresent) {
       pCoef->characteristicRightCount = FDKreadBits(hBs, 4);
-      if ((pCoef->characteristicRightCount + 1) > 16) return DE_MEMORY_ERROR;
+      if ((pCoef->characteristicRightCount + 1) > 8) return DE_MEMORY_ERROR;
       for (i = 0; i < pCoef->characteristicRightCount; i++) {
         err = _readCustomDrcCharacteristic(
             hBs, CS_RIGHT, &(pCoef->characteristicRightFormat[i + 1]),

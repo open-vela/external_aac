@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -139,7 +139,7 @@ static const MP4_ELEMENT_ID channel_configuration_13[] = {
     ID_SCE, ID_CPE, ID_CPE, ID_CPE, ID_CPE, ID_SCE, ID_LFE, ID_LFE, ID_SCE,
     ID_CPE, ID_CPE, ID_SCE, ID_CPE, ID_SCE, ID_SCE, ID_CPE, ID_NONE};
 static const MP4_ELEMENT_ID channel_configuration_14[] = {
-    ID_SCE, ID_CPE, ID_CPE, ID_LFE, ID_CPE, ID_NONE};
+    ID_SCE, ID_CPE, ID_CPE, ID_LAST, ID_CPE, ID_NONE};
 
 static const MP4_ELEMENT_ID *channel_configuration_array[] = {
     channel_configuration_0,  channel_configuration_1,
@@ -467,7 +467,6 @@ void CProgramConfig_GetDefault(CProgramConfig *pPce, const UINT channelConfig) {
       pPce->BackElementIsCpe[1] = 1;
       pPce->NumChannels += 1;
       pPce->NumEffectiveChannels += 1;
-      FDK_FALLTHROUGH;
     case 11: /* 3/0/3.1ch */
       pPce->NumFrontChannelElements += 2;
       pPce->FrontElementIsCpe[0] = 0;
@@ -483,30 +482,25 @@ void CProgramConfig_GetDefault(CProgramConfig *pPce, const UINT channelConfig) {
     /* - - - - - - - - - - - - - - - - - - - - - - - - - - - - */
     case 14:                               /* 2/0/0-3/0/2-0.1ch front height */
       pPce->FrontElementHeightInfo[2] = 1; /* Top speaker */
-      FDK_FALLTHROUGH;
-    case 7: /* 5/0/2.1ch front */
+    case 7:                                /* 5/0/2.1ch front */
       pPce->NumFrontChannelElements += 1;
       pPce->FrontElementIsCpe[2] = 1;
       pPce->NumChannels += 2;
       pPce->NumEffectiveChannels += 2;
-      FDK_FALLTHROUGH;
     case 6: /* 3/0/2.1ch */
       pPce->NumLfeChannelElements += 1;
       pPce->NumChannels += 1;
-      FDK_FALLTHROUGH;
     case 5: /* 3/0/2.0ch */
     case 4: /* 3/0/1.0ch */
       pPce->NumBackChannelElements += 1;
       pPce->BackElementIsCpe[0] = (channelConfig > 4) ? 1 : 0;
       pPce->NumChannels += (channelConfig > 4) ? 2 : 1;
       pPce->NumEffectiveChannels += (channelConfig > 4) ? 2 : 1;
-      FDK_FALLTHROUGH;
     case 3: /* 3/0/0.0ch */
       pPce->NumFrontChannelElements += 1;
       pPce->FrontElementIsCpe[1] = 1;
       pPce->NumChannels += 2;
       pPce->NumEffectiveChannels += 2;
-      FDK_FALLTHROUGH;
     case 1: /* 1/0/0.0ch */
       pPce->NumFrontChannelElements += 1;
       pPce->FrontElementIsCpe[0] = 0;
@@ -719,7 +713,6 @@ int CProgramConfig_LookupElement(CProgramConfig *pPce, UINT channelConfig,
       switch (elType) {
         case ID_CPE:
           isCpe = 1;
-          FDK_FALLTHROUGH;
         case ID_SCE:
           /* search in front channels */
           for (i = 0; i < pPce->NumFrontChannelElements; i++) {
@@ -1300,11 +1293,7 @@ static INT ld_sbr_header(CSAudioSpecificConfig *asc, const INT dsFactor,
   /* read elements of the passed channel_configuration until there is ID_NONE */
   while ((element = channel_configuration_array[channelConfiguration][j]) !=
          ID_NONE) {
-    /* Setup LFE element for upsampling too. This is essential especially for
-     * channel configs where the LFE element is not at the last position for
-     * example in channel config 13 or 14. It leads to memory leaks if the setup
-     * of the LFE element would be done later in the core. */
-    if (element == ID_SCE || element == ID_CPE || element == ID_LFE) {
+    if (element == ID_SCE || element == ID_CPE) {
       error |= cb->cbSbr(
           cb->cbSbrData, hBs, asc->m_samplingFrequency / dsFactor,
           asc->m_extensionSamplingFrequency / dsFactor,
@@ -1325,9 +1314,9 @@ static TRANSPORTDEC_ERROR EldSpecificConfig_Parse(CSAudioSpecificConfig *asc,
                                                   CSTpCallBacks *cb) {
   TRANSPORTDEC_ERROR ErrorStatus = TRANSPORTDEC_OK;
   CSEldSpecificConfig *esc = &asc->m_sc.m_eldSpecificConfig;
-  UINT eldExtType;
+  ASC_ELD_EXT_TYPE eldExtType;
   int eldExtLen, len, cnt, ldSbrLen = 0, eldExtLenSum, numSbrHeader = 0,
-                           sbrIndex, eldExtCnt = 0;
+                           sbrIndex;
 
   unsigned char downscale_fill_nibble;
 
@@ -1394,8 +1383,9 @@ static TRANSPORTDEC_ERROR EldSpecificConfig_Parse(CSAudioSpecificConfig *asc,
   eldExtLenSum = FDKgetValidBits(hBs);
   esc->m_downscaledSamplingFrequency = asc->m_samplingFrequency;
   /* parse ExtTypeConfigData */
-  while (((eldExtType = FDKreadBits(hBs, 4)) != ELDEXT_TERM) &&
-         ((INT)FDKgetValidBits(hBs) >= 0) && (eldExtCnt++ < 15)) {
+  while (
+      ((eldExtType = (ASC_ELD_EXT_TYPE)FDKreadBits(hBs, 4)) != ELDEXT_TERM) &&
+      ((INT)FDKgetValidBits(hBs) >= 0)) {
     eldExtLen = len = FDKreadBits(hBs, 4);
     if (len == 0xf) {
       len = FDKreadBits(hBs, 8);
@@ -1412,23 +1402,17 @@ static TRANSPORTDEC_ERROR EldSpecificConfig_Parse(CSAudioSpecificConfig *asc,
         esc->m_useLdQmfTimeAlign = 1;
         if (cb->cbSsc != NULL) {
           ErrorStatus = (TRANSPORTDEC_ERROR)cb->cbSsc(
-              cb->cbSscData, hBs, asc->m_aot,
-              asc->m_samplingFrequency << esc->m_sbrSamplingRate,
-              asc->m_samplesPerFrame << esc->m_sbrSamplingRate,
+              cb->cbSscData, hBs, asc->m_aot, asc->m_extensionSamplingFrequency,
               1,  /* stereoConfigIndex */
               -1, /* nTimeSlots: read from bitstream */
               eldExtLen, asc->configMode, &asc->SacConfigChanged);
           if (ErrorStatus != TRANSPORTDEC_OK) {
             return TRANSPORTDEC_PARSE_ERROR;
           }
-          if (esc->m_downscaledSamplingFrequency != asc->m_samplingFrequency) {
-            return TRANSPORTDEC_UNSUPPORTED_FORMAT; /* ELDv2 w/ ELD downscaled
-                                                       mode not allowed */
-          }
           break;
         }
 
-        FDK_FALLTHROUGH;
+      /* fall-through */
       default:
         for (cnt = 0; cnt < eldExtLen; cnt++) {
           FDKreadBits(hBs, 8);
@@ -1439,23 +1423,15 @@ static TRANSPORTDEC_ERROR EldSpecificConfig_Parse(CSAudioSpecificConfig *asc,
         UCHAR tmpDownscaleFreqIdx;
         esc->m_downscaledSamplingFrequency =
             getSampleRate(hBs, &tmpDownscaleFreqIdx, 4);
-        if (esc->m_downscaledSamplingFrequency == 0 ||
-            esc->m_downscaledSamplingFrequency > 96000) {
+        if (esc->m_downscaledSamplingFrequency == 0) {
           return TRANSPORTDEC_PARSE_ERROR;
         }
         downscale_fill_nibble = FDKreadBits(hBs, 4);
         if (downscale_fill_nibble != 0x0) {
           return TRANSPORTDEC_PARSE_ERROR;
         }
-        if (esc->m_useLdQmfTimeAlign == 1) {
-          return TRANSPORTDEC_UNSUPPORTED_FORMAT; /* ELDv2 w/ ELD downscaled
-                                                     mode not allowed */
-        }
         break;
     }
-  }
-  if (eldExtType != ELDEXT_TERM) {
-    return TRANSPORTDEC_PARSE_ERROR;
   }
 
   if ((INT)FDKgetValidBits(hBs) < 0) {
@@ -1817,16 +1793,9 @@ static TRANSPORTDEC_ERROR UsacRsv60DecoderConfig_Parse(
 
           if (usc->element[i].m_stereoConfigIndex > 0) {
             if (cb->cbSsc != NULL) {
-              int samplesPerFrame = asc->m_samplesPerFrame;
-
-              if (usc->m_sbrRatioIndex == 1) samplesPerFrame <<= 2;
-              if (usc->m_sbrRatioIndex == 2)
-                samplesPerFrame = (samplesPerFrame * 8) / 3;
-              if (usc->m_sbrRatioIndex == 3) samplesPerFrame <<= 1;
-
               /* Mps212Config() ISO/IEC FDIS 23003-3 */
               if (cb->cbSsc(cb->cbSscData, hBs, asc->m_aot,
-                            asc->m_extensionSamplingFrequency, samplesPerFrame,
+                            asc->m_extensionSamplingFrequency,
                             usc->element[i].m_stereoConfigIndex,
                             usc->m_coreSbrFrameLengthIndex,
                             0, /* don't know the length */
@@ -1951,9 +1920,6 @@ static TRANSPORTDEC_ERROR UsacConfig_Parse(CSAudioSpecificConfig *asc,
   INT nbits = (INT)FDKgetValidBits(hBs);
 
   usacSamplingFrequency = getSampleRate(hBs, &asc->m_samplingFrequencyIndex, 5);
-  if (usacSamplingFrequency == 0 || usacSamplingFrequency > 96000) {
-    return TRANSPORTDEC_PARSE_ERROR;
-  }
   asc->m_samplingFrequency = (UINT)usacSamplingFrequency;
 
   coreSbrFrameLengthIndex = FDKreadBits(hBs, 3);
@@ -2033,8 +1999,7 @@ static TRANSPORTDEC_ERROR AudioSpecificConfig_ExtensionParse(
               self->m_extensionSamplingFrequency = getSampleRate(
                   bs, &self->m_extensionSamplingFrequencyIndex, 4);
 
-              if (self->m_extensionSamplingFrequency == 0 ||
-                  self->m_extensionSamplingFrequency > 96000) {
+              if ((INT)self->m_extensionSamplingFrequency <= 0) {
                 return TRANSPORTDEC_PARSE_ERROR;
               }
             }
@@ -2057,7 +2022,6 @@ static TRANSPORTDEC_ERROR AudioSpecificConfig_ExtensionParse(
         break;
       case ASCEXT_MPS: /* 0x76a */
         if (self->m_extensionAudioObjectType == AOT_MPEGS) break;
-        FDK_FALLTHROUGH;
       case ASCEXT_LDMPS: /* 0x7cc */
         if ((ascExtId == ASCEXT_LDMPS) &&
             (self->m_extensionAudioObjectType == AOT_LD_MPEGS))
@@ -2146,24 +2110,6 @@ TRANSPORTDEC_ERROR AudioSpecificConfig_Parse(
 
     self->m_channelConfiguration = FDKreadBits(bs, 4);
 
-    /* MPEG-04 standard ISO/IEC 14496-3: channelConfiguration == 0 is reserved
-       in er_raw_data_block (table 4.19) and er_raw_data_block_eld (table 4.75)
-       MPEG-04 conformance ISO/IEC 14496-4: channelConfiguration == 0 is not
-       permitted for AOT_ER_AAC_LC, AOT_ER_AAC_LTP, AOT_ER_AAC_LD,
-       AOT_ER_AAC_SCAL (chapter 6.6.4.1.2.1.1) */
-    if ((self->m_channelConfiguration == 0) &&
-        ((self->m_aot == AOT_ER_AAC_LC) || (self->m_aot == AOT_ER_AAC_LTP) ||
-         (self->m_aot == AOT_ER_AAC_LD) || (self->m_aot == AOT_ER_AAC_SCAL) ||
-         (self->m_aot == AOT_ER_AAC_ELD))) {
-      return TRANSPORTDEC_UNSUPPORTED_FORMAT;
-    }
-    /* MPEG-04 conformance ISO/IEC 14496-4: channelConfiguration > 2 is not
-     * permitted for AOT_AAC_SCAL and AOT_ER_AAC_SCAL (chapter 6.6.4.1.2.1.1) */
-    if ((self->m_channelConfiguration > 2) &&
-        ((self->m_aot == AOT_AAC_SCAL) || (self->m_aot == AOT_ER_AAC_SCAL))) {
-      return TRANSPORTDEC_UNSUPPORTED_FORMAT;
-    }
-
     /* SBR extension ( explicit non-backwards compatible mode ) */
     self->m_sbrPresentFlag = 0;
     self->m_psPresentFlag = 0;
@@ -2178,10 +2124,6 @@ TRANSPORTDEC_ERROR AudioSpecificConfig_Parse(
 
       self->m_extensionSamplingFrequency =
           getSampleRate(bs, &self->m_extensionSamplingFrequencyIndex, 4);
-      if (self->m_extensionSamplingFrequency == 0 ||
-          self->m_extensionSamplingFrequency > 96000) {
-        return TRANSPORTDEC_PARSE_ERROR;
-      }
       self->m_aot = getAOT(bs);
 
       switch (self->m_aot) {
@@ -2219,9 +2161,8 @@ TRANSPORTDEC_ERROR AudioSpecificConfig_Parse(
     case AOT_MPEGS:
       if (cb->cbSsc != NULL) {
         if (cb->cbSsc(cb->cbSscData, bs, self->m_aot, self->m_samplingFrequency,
-                      self->m_samplesPerFrame, 1,
-                      -1, /* nTimeSlots: read from bitstream */
-                      0,  /* don't know the length */
+                      1, -1, /* nTimeSlots: read from bitstream */
+                      0,     /* don't know the length */
                       self->configMode, &self->SacConfigChanged)) {
           return TRANSPORTDEC_UNSUPPORTED_FORMAT;
         }
@@ -2404,17 +2345,10 @@ static TRANSPORTDEC_ERROR Drm_xHEAACDecoderConfig(
         /*usc->element[elemIdx].m_stereoConfigIndex =*/FDKreadBits(hBs, 2);
         if (usc->element[elemIdx].m_stereoConfigIndex > 0) {
           if (cb->cbSsc != NULL) {
-            int samplesPerFrame = asc->m_samplesPerFrame;
-
-            if (usc->m_sbrRatioIndex == 1) samplesPerFrame <<= 2;
-            if (usc->m_sbrRatioIndex == 2)
-              samplesPerFrame = (samplesPerFrame * 8) / 3;
-            if (usc->m_sbrRatioIndex == 3) samplesPerFrame <<= 1;
-
             ErrorStatus = (TRANSPORTDEC_ERROR)cb->cbSsc(
                 cb->cbSscData, hBs,
                 AOT_DRM_USAC, /* syntax differs from MPEG Mps212Config() */
-                asc->m_extensionSamplingFrequency, samplesPerFrame,
+                asc->m_extensionSamplingFrequency,
                 usc->element[elemIdx].m_stereoConfigIndex,
                 usc->m_coreSbrFrameLengthIndex, 0, /* don't know the length */
                 asc->configMode, &asc->SacConfigChanged);
@@ -2564,7 +2498,6 @@ TRANSPORTDEC_ERROR DrmRawSdcAudioConfig_Parse(
         switch (audioMode) {
           case 1: /* parametric stereo */
             self->m_psPresentFlag = 1;
-            FDK_FALLTHROUGH;
           case 0: /* mono */
             self->m_channelConfiguration = 1;
             break;

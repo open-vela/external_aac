@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -957,7 +957,7 @@ QmfTransposerCreate(HANDLE_HBE_TRANSPOSER* hQmfTransposer, const int frameSize,
     hQmfTran->qmfOutBufSize = 2 * (hQmfTran->noCols / 2 + QMF_WIN_LEN - 1);
 
     hQmfTran->inBuf_F =
-        (LONG*)FDKcalloc(QMF_SYNTH_CHANNELS + 20 + 1, sizeof(LONG));
+        (INT_PCM*)FDKcalloc(QMF_SYNTH_CHANNELS + 20 + 1, sizeof(INT_PCM));
     /* buffered time signal needs to be delayed by synthesis_size; max
      * synthesis_size = 20; */
     if (hQmfTran->inBuf_F == NULL) {
@@ -1056,10 +1056,6 @@ SBR_ERROR QmfTransposerReInit(HANDLE_HBE_TRANSPOSER hQmfTransposer,
     const FIXP_QTW* tmp_t_sin;
 
     hQmfTransposer->startBand = FreqBandTable[0][0];
-    FDK_ASSERT((!hQmfTransposer->bSbr41 && hQmfTransposer->startBand <= 32) ||
-               (hQmfTransposer->bSbr41 &&
-                hQmfTransposer->startBand <=
-                    16)); /* is checked by resetFreqBandTables() */
     hQmfTransposer->stopBand = FreqBandTable[0][NSfb[0]];
 
     hQmfTransposer->synthSize =
@@ -1339,7 +1335,7 @@ static void addHighBandPart(FIXP_DBL g_r_m, FIXP_DBL g_i_m, INT g_e,
     g_r_m = fMultDiv2(tmp_r, factor_m) << shift;
     g_i_m = fMultDiv2(tmp_i, factor_m) << shift;
     g_e = scale_factor_hbe - (g_e + factor_e + gammaCenter_e + add);
-    g_e = fMax((INT)0, g_e);
+    fMax((INT)0, g_e);
     *qmfHBEBufReal_F += g_r_m >> g_e;
     *qmfHBEBufImag_F += g_i_m >> g_e;
   }
