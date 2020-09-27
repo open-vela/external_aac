@@ -1,0 +1,15 @@
+#
+# For a description of the syntax of this configuration file,
+# see kconfig-language at https://www.kernel.org/doc/Documentation/kbuild/kconfig-language.txt
+#
+
+menu "Fraunhofer FDK AAC"
+
+config CODEC_FDKAAC
+	bool "The Fraunhofer FDK-AAC Library"
+	default n
+	depends on HAVE_CXX
+	---help---
+		Enable support for the Fraunhofer FDK-AAC library
+
+endmenu
