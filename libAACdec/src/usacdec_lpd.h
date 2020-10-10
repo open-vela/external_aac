@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -140,14 +140,13 @@ void CLpdChannelStream_Decode(
  * \param pTimeData pointer to output buffer
  * \param samplesPerFrame amount of output samples
  * \param pSamplingRateInfo holds the sampling rate information
- * \param aacOutDataHeadroom headroom of the output time signal to prevent
- * clipping
+ * \param pWorkBuffer1 pointer to work buffer for temporal data
  */
 AAC_DECODER_ERROR CLpd_RenderTimeSignal(
     CAacDecoderStaticChannelInfo *pAacDecoderStaticChannelInfo,
-    CAacDecoderChannelInfo *pAacDecoderChannelInfo, PCM_DEC *pTimeData,
+    CAacDecoderChannelInfo *pAacDecoderChannelInfo, FIXP_PCM *pTimeData,
     INT samplesPerFrame, SamplingRateInfo *pSamplingRateInfo, UINT frameOk,
-    const INT aacOutDataHeadroom, UINT flags, UINT strmFlags);
+    UINT flags, UINT strmFlags);
 
 static inline INT CLpd_FAC_getLength(int fNotShortBlock, int fac_length_long) {
   if (fNotShortBlock) {
@@ -157,9 +156,8 @@ static inline INT CLpd_FAC_getLength(int fNotShortBlock, int fac_length_long) {
   }
 }
 
-void filtLP(const FIXP_DBL *syn, PCM_DEC *syn_out, FIXP_DBL *noise,
-            const FIXP_SGL *filt, const INT aacOutDataHeadroom, INT stop,
-            int len);
+void filtLP(const FIXP_DBL *syn, FIXP_PCM *syn_out, FIXP_DBL *noise,
+            const FIXP_SGL *filt, INT stop, int len);
 
 /**
  * \brief perform a low-frequency pitch enhancement on time domain signal
@@ -173,14 +171,13 @@ void filtLP(const FIXP_DBL *syn, PCM_DEC *syn_out, FIXP_DBL *noise,
  * \param[in] l_frame length of filtering, must be multiple of L_SUBFR
  * \param[in] l_next length of allowed look ahead on syn[i], i < l_frame+l_next
  * \param[out] synth_out pointer to time domain output signal
- * \param[in] headroom of the output time signal to prevent clipping
  * \param[in,out] mem_bpf pointer to filter memory (L_FILT+L_SUBFR)
  */
 
 void bass_pf_1sf_delay(FIXP_DBL syn[], const INT T_sf[], FIXP_DBL *pit_gain,
                        const int frame_length, const INT l_frame,
-                       const INT l_next, PCM_DEC *synth_out,
-                       const INT aacOutDataHeadroom, FIXP_DBL mem_bpf[]);
+                       const INT l_next, FIXP_PCM *synth_out,
+                       FIXP_DBL mem_bpf[]);
 
 /**
  * \brief random sign generator for FD and TCX noise filling
