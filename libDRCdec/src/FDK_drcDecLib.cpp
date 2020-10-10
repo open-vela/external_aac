@@ -145,10 +145,6 @@ struct s_drc_decoder {
   SEL_PROC_OUTPUT selProcOutput;
 } DRC_DECODER;
 
-static int _getGainStatus(HANDLE_UNI_DRC_GAIN hUniDrcGain) {
-  return hUniDrcGain->status;
-}
-
 static int isResetNeeded(HANDLE_DRC_DECODER hDrcDec,
                          const SEL_PROC_OUTPUT oldSelProcOutput) {
   int i, resetNeeded = 0;
@@ -519,8 +515,6 @@ LONG FDK_drcDec_GetParam(HANDLE_DRC_DECODER hDrcDec,
     }
     case DRC_DEC_TARGET_CHANNEL_COUNT_SELECTED:
       return (LONG)hDrcDec->selProcOutput.targetChannelCount;
-    case DRC_DEC_OUTPUT_LOUDNESS:
-      return (LONG)hDrcDec->selProcOutput.outputLoudness;
     default:
       return 0;
   }
@@ -735,9 +729,7 @@ FDK_drcDec_ReadUniDrcGain(HANDLE_DRC_DECODER hDrcDec,
       &(hDrcDec->uniDrcGain));
   if (dErr) return DRC_DEC_NOT_OK;
 
-  if (_getGainStatus(&(hDrcDec->uniDrcGain))) {
-    hDrcDec->status = DRC_DEC_NEW_GAIN_PAYLOAD;
-  }
+  hDrcDec->status = DRC_DEC_NEW_GAIN_PAYLOAD;
 
   return DRC_DEC_OK;
 }
@@ -759,9 +751,7 @@ FDK_drcDec_ReadUniDrc(HANDLE_DRC_DECODER hDrcDec,
   startSelectionProcess(hDrcDec);
   if (dErr) return DRC_DEC_NOT_OK;
 
-  if (_getGainStatus(&(hDrcDec->uniDrcGain))) {
-    hDrcDec->status = DRC_DEC_NEW_GAIN_PAYLOAD;
-  }
+  hDrcDec->status = DRC_DEC_NEW_GAIN_PAYLOAD;
 
   return DRC_DEC_OK;
 }
