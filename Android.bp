@@ -1,6 +1,7 @@
 cc_library_static {
     name: "libFraunhoferAAC",
     vendor_available: true,
+    host_supported: true,
     srcs: [
         "libAACdec/src/*.cpp",
         "libAACenc/src/*.cpp",
@@ -26,13 +27,12 @@ cc_library_static {
         "-DSUPPRESS_BUILD_DATE_INFO",
     ],
     sanitize: {
-        misc_undefined:[
-           "unsigned-integer-overflow",
-           "signed-integer-overflow",
-           "bounds",
+        misc_undefined: [
+            "unsigned-integer-overflow",
+            "signed-integer-overflow",
+            "bounds",
         ],
-        // Enable CFI if this becomes a shared library.
-        // cfi: true,
+        cfi: true,
     },
     shared_libs: [
         "liblog",
@@ -52,6 +52,12 @@ cc_library_static {
         "libSACdec/include",
         "libSACenc/include",
     ],
+
+    target: {
+        darwin: {
+            enabled: false,
+        },
+    },
 
     apex_available: [
         "//apex_available:platform",
