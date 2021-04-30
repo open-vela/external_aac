@@ -1694,7 +1694,8 @@ static TRANSPORTDEC_ERROR extElementConfig(CSUsacExtElementConfig *extElement,
                                            const AUDIO_OBJECT_TYPE aot) {
   TRANSPORTDEC_ERROR ErrorStatus = TRANSPORTDEC_OK;
 
-  UINT usacExtElementType = escapedValue(hBs, 4, 8, 16);
+  USAC_EXT_ELEMENT_TYPE usacExtElementType =
+      (USAC_EXT_ELEMENT_TYPE)escapedValue(hBs, 4, 8, 16);
 
   /* recurve extension elements which are invalid for USAC */
   if (aot == AOT_USAC) {
@@ -1711,6 +1712,7 @@ static TRANSPORTDEC_ERROR extElementConfig(CSUsacExtElementConfig *extElement,
     }
   }
 
+  extElement->usacExtElementType = usacExtElementType;
   int usacExtElementConfigLength = escapedValue(hBs, 4, 8, 16);
   extElement->usacExtElementConfigLength = (USHORT)usacExtElementConfigLength;
   INT bsAnchor;
@@ -1744,10 +1746,8 @@ static TRANSPORTDEC_ERROR extElementConfig(CSUsacExtElementConfig *extElement,
       }
     } break;
     default:
-      usacExtElementType = ID_EXT_ELE_UNKNOWN;
       break;
   }
-  extElement->usacExtElementType = (USAC_EXT_ELEMENT_TYPE)usacExtElementType;
 
   /* Adjust bit stream position. This is required because of byte alignment and
    * unhandled extensions. */
@@ -1776,7 +1776,7 @@ static TRANSPORTDEC_ERROR configExtension(CSUsacConfig *usc,
   TRANSPORTDEC_ERROR ErrorStatus = TRANSPORTDEC_OK;
 
   int numConfigExtensions;
-  UINT usacConfigExtType;
+  CONFIG_EXT_ID usacConfigExtType;
   int usacConfigExtLength;
   int loudnessInfoSetIndex =
       -1; /* index of loudnessInfoSet config extension. -1 if not contained. */
@@ -1787,7 +1787,7 @@ static TRANSPORTDEC_ERROR configExtension(CSUsacConfig *usc,
   for (int confExtIdx = 0; confExtIdx < numConfigExtensions; confExtIdx++) {
     INT nbits;
     int loudnessInfoSetConfigExtensionPosition = FDKgetValidBits(hBs);
-    usacConfigExtType = escapedValue(hBs, 4, 8, 16);
+    usacConfigExtType = (CONFIG_EXT_ID)escapedValue(hBs, 4, 8, 16);
     usacConfigExtLength = (int)escapedValue(hBs, 4, 8, 16);
 
     /* Start bit position of config extension */
