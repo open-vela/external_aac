@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2021 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2020 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -229,13 +229,15 @@ inline void combineSignalCplxScale1(FIXP_DBL *hybOutputRealDry,
   int n;
   FIXP_DBL scaleY;
   for (n = bands - 1; n >= 0; n--) {
-    scaleY = fMult(scaleX, *pBP);
+    scaleY = fMultDiv2(scaleX, *pBP);
     *hybOutputRealDry = SATURATE_LEFT_SHIFT(
-        (*hybOutputRealDry >> SF_SCALE) + fMult(*hybOutputRealWet, scaleY),
-        SF_SCALE, DFRACT_BITS);
+        (*hybOutputRealDry >> 1) +
+            (fMultDiv2(*hybOutputRealWet, scaleY) << (SF_SCALE + 1)),
+        1, DFRACT_BITS);
     *hybOutputImagDry = SATURATE_LEFT_SHIFT(
-        (*hybOutputImagDry >> SF_SCALE) + fMult(*hybOutputImagWet, scaleY),
-        SF_SCALE, DFRACT_BITS);
+        (*hybOutputImagDry >> 1) +
+            (fMultDiv2(*hybOutputImagWet, scaleY) << (SF_SCALE + 1)),
+        1, DFRACT_BITS);
     hybOutputRealDry++, hybOutputRealWet++;
     hybOutputImagDry++, hybOutputImagWet++;
     pBP++;
@@ -251,11 +253,14 @@ inline void combineSignalCplxScale2(FIXP_DBL *hybOutputRealDry,
 
   for (n = bands - 1; n >= 0; n--) {
     *hybOutputRealDry = SATURATE_LEFT_SHIFT(
-        (*hybOutputRealDry >> SF_SCALE) + fMult(*hybOutputRealWet, scaleX),
-        SF_SCALE, DFRACT_BITS);
+        (*hybOutputRealDry >> 1) +
+            (fMultDiv2(*hybOutputRealWet, scaleX) << SF_SCALE),
+        1, DFRACT_BITS);
     *hybOutputImagDry = SATURATE_LEFT_SHIFT(
-        (*hybOutputImagDry >> SF_SCALE) + fMult(*hybOutputImagWet, scaleX),
-        SF_SCALE, DFRACT_BITS);
+        (*hybOutputImagDry >> 1) +
+            (fMultDiv2(*hybOutputImagWet, scaleX) << SF_SCALE),
+        1, DFRACT_BITS);
+    ;
     hybOutputRealDry++, hybOutputRealWet++;
     hybOutputImagDry++, hybOutputImagWet++;
   }
