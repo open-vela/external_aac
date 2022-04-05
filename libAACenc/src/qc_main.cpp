@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2020 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -373,8 +373,13 @@ AAC_ENCODER_ERROR FDKaacEnc_QCInit(QC_STATE* hQC, struct QC_INIT* init,
   hQC->invQuant = init->invQuant;
   hQC->maxIterations = init->maxIterations;
 
-  /* 0: full bitreservoir, 1: reduced bitreservoir, 2: disabled bitreservoir */
-  hQC->bitResMode = init->bitResMode;
+  if (isConstantBitrateMode(hQC->bitrateMode)) {
+    /* 0: full bitreservoir, 1: reduced bitreservoir, 2: disabled bitreservoir
+     */
+    hQC->bitResMode = init->bitResMode;
+  } else {
+    hQC->bitResMode = AACENC_BR_MODE_FULL; /* full bitreservoir */
+  }
 
   hQC->padding.paddingRest = init->padding.paddingRest;
 
@@ -795,15 +800,10 @@ AAC_ENCODER_ERROR FDKaacEnc_QCMain(QC_STATE* RESTRICT hQC, PSY_OUT** psyOut,
   INT avgTotalDynBits = 0; /* maximal allowed dynamic bits for all frames */
   INT totalAvailableBits = 0;
   INT nSubFrames = 1;
-  const INT isCBRAdjustment = (isConstantBitrateMode(hQC->bitrateMode) ||
-                               (hQC->bitResMode != AACENC_BR_MODE_FULL))
-                                  ? 1
-                                  : 0;
 
   /*-------------------------------------------- */
   /* redistribute total bitreservoir to elements */
-  ErrorStatus = FDKaacEnc_BitResRedistribution(
-      hQC, cm, (isCBRAdjustment == 0) ? hQC->maxBitsPerFrame : avgTotalBits);
+  ErrorStatus = FDKaacEnc_BitResRedistribution(hQC, cm, avgTotalBits);
   if (ErrorStatus != AAC_ENC_OK) {
     return ErrorStatus;
   }
@@ -831,22 +831,33 @@ AAC_ENCODER_ERROR FDKaacEnc_QCMain(QC_STATE* RESTRICT hQC, PSY_OUT** psyOut,
 
   /*-------------------------------------------- */
   /*-------------------------------------------- */
-  /* calc granted dynamic bits for sub frame and
-     distribute it to each element */
-  ErrorStatus = FDKaacEnc_prepareBitDistribution(
-      hQC, psyOut, qcOut, cm, qcElement,
-      (isCBRAdjustment == 0) ? hQC->maxBitsPerFrame : avgTotalBits,
-      &totalAvailableBits, &avgTotalDynBits);
+  if (isConstantBitrateMode(hQC->bitrateMode)) {
+    /* calc granted dynamic bits for sub frame and
+       distribute it to each element */
+    ErrorStatus = FDKaacEnc_prepareBitDistribution(
+        hQC, psyOut, qcOut, cm, qcElement, avgTotalBits, &totalAvailableBits,
+        &avgTotalDynBits);
 
-  if (ErrorStatus != AAC_ENC_OK) {
-    return ErrorStatus;
+    if (ErrorStatus != AAC_ENC_OK) {
+      return ErrorStatus;
+    }
+  } else {
+    qcOut[0]->grantedDynBits =
+        ((hQC->maxBitsPerFrame - (hQC->globHdrBits)) & ~7) -
+        (qcOut[0]->globalExtBits + qcOut[0]->staticBits +
+         qcOut[0]->elementExtBits);
+    qcOut[0]->maxDynBits = qcOut[0]->grantedDynBits;
+
+    totalAvailableBits = hQC->maxBitsPerFrame;
+    avgTotalDynBits = 0;
   }
 
   /* for ( all sub frames ) ... */
   for (c = 0; c < nSubFrames; c++) {
     /* for CBR and VBR mode */
     FDKaacEnc_AdjustThresholds(hQC->hAdjThr, qcElement[c], qcOut[c],
-                               psyOut[c]->psyOutElement, isCBRAdjustment, cm);
+                               psyOut[c]->psyOutElement,
+                               isConstantBitrateMode(hQC->bitrateMode), cm);
 
   } /* -end- sub frame counter */
 

@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2020 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -713,8 +713,7 @@ void sbr_dec(
 
   } else { /* (flags & SBRDEC_PS_DECODED) */
     INT sdiff;
-    INT scaleFactorHighBand, scaleFactorLowBand_ov, scaleFactorLowBand_no_ov,
-        outScalefactor, outScalefactorR, outScalefactorL;
+    INT scaleFactorHighBand, scaleFactorLowBand_ov, scaleFactorLowBand_no_ov;
 
     HANDLE_QMF_FILTER_BANK synQmf = &hSbrDec->qmfDomainOutCh->fb;
     HANDLE_QMF_FILTER_BANK synQmfRight = &hSbrDecRight->qmfDomainOutCh->fb;
@@ -745,7 +744,7 @@ void sbr_dec(
       */
       FDK_ASSERT(hSbrDec->qmfDomainInCh->pGlobalConf->nBandsSynthesis <=
                  QMF_MAX_SYNTHESIS_BANDS);
-      synQmfRight->outScalefactor = synQmf->outScalefactor;
+      qmfChangeOutScalefactor(synQmfRight, -(8));
       FDKmemcpy(synQmfRight->FilterStates, synQmf->FilterStates,
                 9 * hSbrDec->qmfDomainInCh->pGlobalConf->nBandsSynthesis *
                     sizeof(FIXP_QSS));
@@ -789,11 +788,9 @@ void sbr_dec(
       FDKmemcpy(&hSbrDecRight->sbrDrcChannel, &hSbrDec->sbrDrcChannel,
                 sizeof(SBRDEC_DRC_CHANNEL));
 
-      outScalefactor = maxShift - (8);
-      outScalefactorL = outScalefactorR =
-          sbrInDataHeadroom + 1; /* +1: psDiffScale! (MPEG-PS) */
-
       for (i = 0; i < synQmf->no_col; i++) { /* ----- no_col loop ----- */
+
+        INT outScalefactorR, outScalefactorL;
 
         /* qmf timeslot of right channel */
         FIXP_DBL *rQmfReal = pWorkBuffer;
@@ -818,20 +815,27 @@ void sbr_dec(
                   ? scaleFactorLowBand_ov
                   : scaleFactorLowBand_no_ov,
               scaleFactorHighBand, synQmf->lsb, synQmf->usb);
+
+          outScalefactorL = outScalefactorR =
+              1 + sbrInDataHeadroom; /* psDiffScale! (MPEG-PS) */
         }
 
         sbrDecoder_drcApplySlot(/* right channel */
                                 &hSbrDecRight->sbrDrcChannel, rQmfReal,
                                 rQmfImag, i, synQmfRight->no_col, maxShift);
 
+        outScalefactorR += maxShift;
+
         sbrDecoder_drcApplySlot(/* left channel */
                                 &hSbrDec->sbrDrcChannel, *(pLowBandReal + i),
                                 *(pLowBandImag + i), i, synQmf->no_col,
                                 maxShift);
 
+        outScalefactorL += maxShift;
+
         if (!(flags & SBRDEC_SKIP_QMF_SYN)) {
-          qmfChangeOutScalefactor(synQmf, outScalefactor);
-          qmfChangeOutScalefactor(synQmfRight, outScalefactor);
+          qmfChangeOutScalefactor(synQmf, -(8));
+          qmfChangeOutScalefactor(synQmfRight, -(8));
 
           qmfSynthesisFilteringSlot(
               synQmfRight, rQmfReal, /* QMF real buffer */
