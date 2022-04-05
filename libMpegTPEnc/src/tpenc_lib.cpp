@@ -647,7 +647,7 @@ TRANSPORTENC_ERROR transportEnc_GetLibInfo(LIB_INFO *info) {
   info->module_id = FDK_TPENC;
   info->version = LIB_VERSION(TP_LIB_VL0, TP_LIB_VL1, TP_LIB_VL2);
   LIB_VERSION_STRING(info);
-#ifdef SUPPRESS_BUILD_DATE_INFO
+#ifdef __ANDROID__
   info->build_date = "";
   info->build_time = "";
 #else

@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2021 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -143,11 +143,13 @@ amm-info@iis.fraunhofer.de
 #include "env_extr.h"
 #include "sbr_dec.h"
 #include "env_dec.h"
-#include "FDK_crc.h"
+#include "sbr_crc.h"
 #include "sbr_ram.h"
 #include "sbr_rom.h"
 #include "lpp_tran.h"
 #include "transcendent.h"
+
+#include "FDK_crc.h"
 
 #include "sbrdec_drc.h"
 
@@ -155,10 +157,10 @@ amm-info@iis.fraunhofer.de
 
 /* Decoder library info */
 #define SBRDECODER_LIB_VL0 3
-#define SBRDECODER_LIB_VL1 1
+#define SBRDECODER_LIB_VL1 0
 #define SBRDECODER_LIB_VL2 0
 #define SBRDECODER_LIB_TITLE "SBR Decoder"
-#ifdef SUPPRESS_BUILD_DATE_INFO
+#ifdef __ANDROID__
 #define SBRDECODER_LIB_BUILD_DATE ""
 #define SBRDECODER_LIB_BUILD_TIME ""
 #else
@@ -961,10 +963,8 @@ SBR_ERROR sbrDecoder_SetParam(HANDLE_SBRDECODER self, const SBRDEC_PARAM param,
 
           /* Set sync state UPSAMPLING for the corresponding slot.
              This switches off bitstream parsing until a new header arrives. */
-          if (hSbrHeader->syncState != SBR_NOT_INITIALIZED) {
-            hSbrHeader->syncState = UPSAMPLING;
-            hSbrHeader->status |= SBRDEC_HDR_STAT_UPDATE;
-          }
+          hSbrHeader->syncState = UPSAMPLING;
+          hSbrHeader->status |= SBRDEC_HDR_STAT_UPDATE;
         }
       }
     } break;
@@ -1134,22 +1134,18 @@ SBR_ERROR sbrDecoder_Parse(HANDLE_SBRDECODER self, HANDLE_FDK_BITSTREAM hBs,
   SBR_HEADER_STATUS headerStatus = HEADER_NOT_PRESENT;
 
   INT startPos = FDKgetValidBits(hBs);
-  FDK_CRCINFO crcInfo;
-  INT crcReg = 0;
-  USHORT sbrCrc = 0;
-  UINT crcPoly;
-  UINT crcStartValue = 0;
-  UINT crcLen;
-
+  INT CRCLen = 0;
   HANDLE_FDK_BITSTREAM hBsOriginal = hBs;
   FDK_BITSTREAM bsBwd;
 
+  FDK_CRCINFO crcInfo;
+  INT crcReg = 0;
+  USHORT drmSbrCrc = 0;
   const int fGlobalIndependencyFlag = acFlags & AC_INDEP;
   const int bs_pvc = acElFlags[elementIndex] & AC_EL_USAC_PVC;
   const int bs_interTes = acElFlags[elementIndex] & AC_EL_USAC_ITES;
   int stereo;
   int fDoDecodeSbrData = 1;
-  int alignBits = 0;
 
   int lastSlot, lastHdrSlot = 0, thisHdrSlot = 0;
 
@@ -1281,23 +1277,27 @@ SBR_ERROR sbrDecoder_Parse(HANDLE_SBRDECODER self, HANDLE_FDK_BITSTREAM hBs,
   if (fDoDecodeSbrData) {
     if (crcFlag) {
       switch (self->coreCodec) {
+        case AOT_ER_AAC_ELD:
+          FDKpushFor(hBs, 10);
+          /* check sbrcrc later: we don't know the payload length now */
+          break;
         case AOT_DRM_AAC:
         case AOT_DRM_SURROUND:
-          crcPoly = 0x001d;
-          crcLen = 8;
-          crcStartValue = 0x000000ff;
+          drmSbrCrc = (USHORT)FDKreadBits(hBs, 8);
+          /* Setup CRC decoder */
+          FDKcrcInit(&crcInfo, 0x001d, 0xFFFF, 8);
+          /* Start CRC region */
+          crcReg = FDKcrcStartReg(&crcInfo, hBs, 0);
           break;
         default:
-          crcPoly = 0x0633;
-          crcLen = 10;
-          crcStartValue = 0x00000000;
+          CRCLen = bsPayLen - 10; /* change: 0 => i */
+          if (CRCLen < 0) {
+            fDoDecodeSbrData = 0;
+          } else {
+            fDoDecodeSbrData = SbrCrcCheck(hBs, CRCLen);
+          }
           break;
       }
-      sbrCrc = (USHORT)FDKreadBits(hBs, crcLen);
-      /* Setup CRC decoder */
-      FDKcrcInit(&crcInfo, crcPoly, crcStartValue, crcLen);
-      /* Start CRC region */
-      crcReg = FDKcrcStartReg(&crcInfo, hBs, 0);
     }
   } /* if (fDoDecodeSbrData) */
 
@@ -1373,9 +1373,7 @@ SBR_ERROR sbrDecoder_Parse(HANDLE_SBRDECODER self, HANDLE_FDK_BITSTREAM hBs,
       }
       if (headerStatus == HEADER_ERROR) {
         /* Corrupt SBR info data, do not decode and switch to UPSAMPLING */
-        hSbrHeader->syncState = hSbrHeader->syncState > UPSAMPLING
-                                    ? UPSAMPLING
-                                    : hSbrHeader->syncState;
+        hSbrHeader->syncState = UPSAMPLING;
         fDoDecodeSbrData = 0;
         sbrHeaderPresent = 0;
       }
@@ -1452,6 +1450,35 @@ SBR_ERROR sbrDecoder_Parse(HANDLE_SBRDECODER self, HANDLE_FDK_BITSTREAM hBs,
         valBits = (INT)FDKgetValidBits(hBs);
       }
 
+      if (crcFlag) {
+        switch (self->coreCodec) {
+          case AOT_ER_AAC_ELD: {
+            /* late crc check for eld */
+            INT payloadbits =
+                (INT)startPos - (INT)FDKgetValidBits(hBs) - startPos;
+            INT crcLen = payloadbits - 10;
+            FDKpushBack(hBs, payloadbits);
+            fDoDecodeSbrData = SbrCrcCheck(hBs, crcLen);
+            FDKpushFor(hBs, crcLen);
+          } break;
+          case AOT_DRM_AAC:
+          case AOT_DRM_SURROUND:
+            /* End CRC region */
+            FDKcrcEndReg(&crcInfo, hBs, crcReg);
+            /* Check CRC */
+            if ((FDKcrcGetCRC(&crcInfo) ^ 0xFF) != drmSbrCrc) {
+              fDoDecodeSbrData = 0;
+              if (headerStatus != HEADER_NOT_PRESENT) {
+                headerStatus = HEADER_ERROR;
+                hSbrHeader->syncState = SBR_NOT_INITIALIZED;
+              }
+            }
+            break;
+          default:
+            break;
+        }
+      }
+
       /* sanity check of remaining bits */
       if (valBits < 0) {
         fDoDecodeSbrData = 0;
@@ -1462,7 +1489,7 @@ SBR_ERROR sbrDecoder_Parse(HANDLE_SBRDECODER self, HANDLE_FDK_BITSTREAM hBs,
           case AOT_AAC_LC: {
             /* This sanity check is only meaningful with General Audio
              * bitstreams */
-            alignBits = valBits & 0x7;
+            int alignBits = valBits & 0x7;
 
             if (valBits > alignBits) {
               fDoDecodeSbrData = 0;
@@ -1479,20 +1506,6 @@ SBR_ERROR sbrDecoder_Parse(HANDLE_SBRDECODER self, HANDLE_FDK_BITSTREAM hBs,
        not parse the frame data. Return an error so that the caller can react
        respectively. */
     errorStatus = SBRDEC_PARSE_ERROR;
-  }
-
-  if (crcFlag && (hSbrHeader->syncState >= SBR_HEADER) && fDoDecodeSbrData) {
-    FDKpushFor(hBs, alignBits);
-    FDKcrcEndReg(&crcInfo, hBs, crcReg); /* End CRC region */
-    FDKpushBack(hBs, alignBits);
-    /* Check CRC */
-    if ((FDKcrcGetCRC(&crcInfo) ^ crcStartValue) != sbrCrc) {
-      fDoDecodeSbrData = 0;
-      if (headerStatus != HEADER_NOT_PRESENT) {
-        headerStatus = HEADER_ERROR;
-        hSbrHeader->syncState = SBR_NOT_INITIALIZED;
-      }
-    }
   }
 
   if (!fDoDecodeSbrData) {
@@ -1574,10 +1587,10 @@ bail:
  * \return SBRDEC_OK if successfull, else error code
  */
 static SBR_ERROR sbrDecoder_DecodeElement(
-    HANDLE_SBRDECODER self, LONG *input, LONG *timeData, const int timeDataSize,
-    const FDK_channelMapDescr *const mapDescr, const int mapIdx,
-    int channelIndex, const int elementIndex, const int numInChannels,
-    int *numOutChannels, const int psPossible) {
+    HANDLE_SBRDECODER self, QDOM_PCM *input, INT_PCM *timeData,
+    const int timeDataSize, const FDK_channelMapDescr *const mapDescr,
+    const int mapIdx, int channelIndex, const int elementIndex,
+    const int numInChannels, int *numOutChannels, const int psPossible) {
   SBR_DECODER_ELEMENT *hSbrElement = self->pSbrElement[elementIndex];
   HANDLE_SBR_CHANNEL *pSbrChannel =
       self->pSbrElement[elementIndex]->pSbrChannel;
@@ -1614,9 +1627,7 @@ static SBR_ERROR sbrDecoder_DecodeElement(
       /* No valid SBR payload available, hence switch to upsampling (in all
        * headers) */
       for (hdrIdx = 0; hdrIdx < ((1) + 1); hdrIdx += 1) {
-        if (self->sbrHeader[elementIndex][hdrIdx].syncState > UPSAMPLING) {
-          self->sbrHeader[elementIndex][hdrIdx].syncState = UPSAMPLING;
-        }
+        self->sbrHeader[elementIndex][hdrIdx].syncState = UPSAMPLING;
       }
     } else {
       /* Move frame pointer to the next slot which is up to be decoded/applied
@@ -1749,7 +1760,7 @@ static SBR_ERROR sbrDecoder_DecodeElement(
             timeData + offset1, strideOut, hSbrHeader, hFrameDataLeft,
             &pSbrChannel[0]->prevFrameData,
             (hSbrHeader->syncState == SBR_ACTIVE), h_ps_d, self->flags,
-            codecFrameSize, self->sbrInDataHeadroom);
+            codecFrameSize);
 
     if (stereo) {
       /* Process right channel */
@@ -1757,7 +1768,7 @@ static SBR_ERROR sbrDecoder_DecodeElement(
               timeData + offset1, NULL, NULL, strideOut, hSbrHeader,
               hFrameDataRight, &pSbrChannel[1]->prevFrameData,
               (hSbrHeader->syncState == SBR_ACTIVE), NULL, self->flags,
-              codecFrameSize, self->sbrInDataHeadroom);
+              codecFrameSize);
     }
 
     C_ALLOC_SCRATCH_END(pPsScratch, struct PS_DEC_COEFFICIENTS, 1)
@@ -1777,14 +1788,14 @@ static SBR_ERROR sbrDecoder_DecodeElement(
       int copyFrameSize =
           codecFrameSize * self->pQmfDomain->QmfDomainOut->fb.no_channels;
       copyFrameSize /= self->pQmfDomain->QmfDomainIn->fb.no_channels;
-      LONG *ptr;
+      INT_PCM *ptr;
       INT i;
       FDK_ASSERT(strideOut == 2);
 
       ptr = timeData;
       for (i = copyFrameSize >> 1; i--;) {
-        LONG tmp; /* This temporal variable is required because some compilers
-                     can't do *ptr++ = *ptr++ correctly. */
+        INT_PCM tmp; /* This temporal variable is required because some
+                        compilers can't do *ptr++ = *ptr++ correctly. */
         tmp = *ptr++;
         *ptr++ = tmp;
         tmp = *ptr++;
@@ -1797,13 +1808,12 @@ static SBR_ERROR sbrDecoder_DecodeElement(
   return errorStatus;
 }
 
-SBR_ERROR sbrDecoder_Apply(HANDLE_SBRDECODER self, LONG *input, LONG *timeData,
-                           const int timeDataSize, int *numChannels,
-                           int *sampleRate,
+SBR_ERROR sbrDecoder_Apply(HANDLE_SBRDECODER self, INT_PCM *input,
+                           INT_PCM *timeData, const int timeDataSize,
+                           int *numChannels, int *sampleRate,
                            const FDK_channelMapDescr *const mapDescr,
                            const int mapIdx, const int coreDecodedOk,
-                           UCHAR *psDecoded, const INT inDataHeadroom,
-                           INT *outDataHeadroom) {
+                           UCHAR *psDecoded) {
   SBR_ERROR errorStatus = SBRDEC_OK;
 
   int psPossible;
@@ -1839,9 +1849,6 @@ SBR_ERROR sbrDecoder_Apply(HANDLE_SBRDECODER self, LONG *input, LONG *timeData,
   if (self->numSbrElements != 1 || self->pSbrElement[0]->elementID != ID_SCE) {
     psPossible = 0;
   }
-
-  self->sbrInDataHeadroom = inDataHeadroom;
-  *outDataHeadroom = (INT)(8);
 
   /* Make sure that even if no SBR data was found/parsed *psDecoded is returned
    * 1 if psPossible was 0. */

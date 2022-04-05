@@ -92,82 +92,68 @@ www.iis.fraunhofer.de/amm
 amm-info@iis.fraunhofer.de
 ----------------------------------------------------------------------------- */
 
-/**************************** AAC decoder library ******************************
+/**************************** SBR decoder library ******************************
 
-   Author(s):   Matthias Hildenbrand
+   Author(s):   Arthur Tritthart
 
-   Description:
+   Description: (ARM optimised) LPP transposer subroutines
 
 *******************************************************************************/
 
-#include "FDK_delay.h"
+#if defined(__arm__)
 
-#include "genericStds.h"
+#define FUNCTION_LPPTRANSPOSER_func1
 
-#define MAX_FRAME_LENGTH (1024)
+#ifdef FUNCTION_LPPTRANSPOSER_func1
 
-INT FDK_Delay_Create(FDK_SignalDelay* data, const USHORT delay,
-                     const UCHAR num_channels) {
-  FDK_ASSERT(data != NULL);
-  FDK_ASSERT(num_channels > 0);
+/* Note: This code requires only 43 cycles per iteration instead of 61 on
+ * ARM926EJ-S */
+static void lppTransposer_func1(FIXP_DBL *lowBandReal, FIXP_DBL *lowBandImag,
+                                FIXP_DBL **qmfBufferReal,
+                                FIXP_DBL **qmfBufferImag, int loops, int hiBand,
+                                int dynamicScale, int descale, FIXP_SGL a0r,
+                                FIXP_SGL a0i, FIXP_SGL a1r, FIXP_SGL a1i,
+                                const int fPreWhitening,
+                                FIXP_DBL preWhiteningGain,
+                                int preWhiteningGains_sf) {
+  FIXP_DBL real1, real2, imag1, imag2, accu1, accu2;
 
-  if (delay > 0) {
-    data->delay_line =
-        (INT_PCM*)FDKcalloc(num_channels * delay, sizeof(INT_PCM));
-    if (data->delay_line == NULL) {
-      return -1;
+  real2 = lowBandReal[-2];
+  real1 = lowBandReal[-1];
+  imag2 = lowBandImag[-2];
+  imag1 = lowBandImag[-1];
+  for (int i = 0; i < loops; i++) {
+    accu1 = fMultDiv2(a0r, real1);
+    accu2 = fMultDiv2(a0i, imag1);
+    accu1 = fMultAddDiv2(accu1, a1r, real2);
+    accu2 = fMultAddDiv2(accu2, a1i, imag2);
+    real2 = fMultDiv2(a1i, real2);
+    accu1 = accu1 - accu2;
+    accu1 = accu1 >> dynamicScale;
+
+    accu2 = fMultAddDiv2(real2, a1r, imag2);
+    real2 = real1;
+    imag2 = imag1;
+    accu2 = fMultAddDiv2(accu2, a0i, real1);
+    real1 = lowBandReal[i];
+    accu2 = fMultAddDiv2(accu2, a0r, imag1);
+    imag1 = lowBandImag[i];
+    accu2 = accu2 >> dynamicScale;
+
+    accu1 <<= 1;
+    accu2 <<= 1;
+    accu1 += (real1 >> descale);
+    accu2 += (imag1 >> descale);
+    if (fPreWhitening) {
+      accu1 = scaleValueSaturate(fMultDiv2(accu1, preWhiteningGain),
+                                 preWhiteningGains_sf);
+      accu2 = scaleValueSaturate(fMultDiv2(accu2, preWhiteningGain),
+                                 preWhiteningGains_sf);
     }
-  } else {
-    data->delay_line = NULL;
+    qmfBufferReal[i][hiBand] = accu1;
+    qmfBufferImag[i][hiBand] = accu2;
   }
-  data->num_channels = num_channels;
-  data->delay = delay;
-
-  return 0;
 }
+#endif /* #ifdef FUNCTION_LPPTRANSPOSER_func1 */
 
-void FDK_Delay_Apply(FDK_SignalDelay* data, FIXP_PCM* time_buffer,
-                     const UINT frame_length, const UCHAR channel) {
-  FDK_ASSERT(data != NULL);
-
-  if (data->delay > 0) {
-    C_ALLOC_SCRATCH_START(tmp, FIXP_PCM, MAX_FRAME_LENGTH)
-    FDK_ASSERT(frame_length <= MAX_FRAME_LENGTH);
-    FDK_ASSERT(channel < data->num_channels);
-    FDK_ASSERT(time_buffer != NULL);
-    if (frame_length >= data->delay) {
-      FDKmemcpy(tmp, &time_buffer[frame_length - data->delay],
-                data->delay * sizeof(FIXP_PCM));
-      FDKmemmove(&time_buffer[data->delay], &time_buffer[0],
-                 (frame_length - data->delay) * sizeof(FIXP_PCM));
-      FDKmemcpy(&time_buffer[0], &data->delay_line[channel * data->delay],
-                data->delay * sizeof(FIXP_PCM));
-      FDKmemcpy(&data->delay_line[channel * data->delay], tmp,
-                data->delay * sizeof(FIXP_PCM));
-    } else {
-      FDKmemcpy(tmp, &time_buffer[0], frame_length * sizeof(FIXP_PCM));
-      FDKmemcpy(&time_buffer[0], &data->delay_line[channel * data->delay],
-                frame_length * sizeof(FIXP_PCM));
-      FDKmemcpy(&data->delay_line[channel * data->delay],
-                &data->delay_line[channel * data->delay + frame_length],
-                (data->delay - frame_length) * sizeof(FIXP_PCM));
-      FDKmemcpy(&data->delay_line[channel * data->delay +
-                                  (data->delay - frame_length)],
-                tmp, frame_length * sizeof(FIXP_PCM));
-    }
-    C_ALLOC_SCRATCH_END(tmp, FIXP_PCM, MAX_FRAME_LENGTH)
-  }
-
-  return;
-}
-
-void FDK_Delay_Destroy(FDK_SignalDelay* data) {
-  if (data->delay_line != NULL) {
-    FDKfree(data->delay_line);
-  }
-  data->delay_line = NULL;
-  data->delay = 0;
-  data->num_channels = 0;
-
-  return;
-}
+#endif /* __arm__ */
