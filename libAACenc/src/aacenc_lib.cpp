@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2021 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -112,7 +112,7 @@ amm-info@iis.fraunhofer.de
 #define AACENCODER_LIB_VL1 0
 #define AACENCODER_LIB_VL2 1
 #define AACENCODER_LIB_TITLE "AAC Encoder"
-#ifdef SUPPRESS_BUILD_DATE_INFO
+#ifdef __ANDROID__
 #define AACENCODER_LIB_BUILD_DATE ""
 #define AACENCODER_LIB_BUILD_TIME ""
 #else
@@ -1028,13 +1028,6 @@ static AACENC_ERROR FDKaacEnc_AdjustEncSettings(HANDLE_AACENCODER hAacEncoder,
     case AACENC_BR_MODE_VBR_3:
     case AACENC_BR_MODE_VBR_4:
     case AACENC_BR_MODE_VBR_5:
-      /* Adjust bitrate mode in case given peak bitrate is lower than expected
-       * VBR bitrate. */
-      if ((INT)config->userPeakBitrate != -1) {
-        hAacConfig->bitrateMode = FDKaacEnc_AdjustVBRBitrateMode(
-            hAacConfig->bitrateMode, config->userPeakBitrate,
-            hAacConfig->channelMode);
-      }
       /* Get bitrate in VBR configuration */
       /* In VBR mode; SBR-modul depends on bitrate, core encoder on bitrateMode.
        */
@@ -1242,7 +1235,7 @@ static INT aacenc_SbrCallback(void *self, HANDLE_FDK_BITSTREAM hBs,
 INT aacenc_SscCallback(void *self, HANDLE_FDK_BITSTREAM hBs,
                        const AUDIO_OBJECT_TYPE coreCodec,
                        const INT samplingRate, const INT frameSize,
-                       const INT numChannels, const INT stereoConfigIndex,
+                       const INT stereoConfigIndex,
                        const INT coreSbrFrameLengthIndex, const INT configBytes,
                        const UCHAR configMode, UCHAR *configChanged) {
   HANDLE_AACENCODER hAacEncoder = (HANDLE_AACENCODER)self;
@@ -1784,8 +1777,8 @@ AACENC_ERROR aacEncEncode(const HANDLE_AACENCODER hAacEncoder,
                                                    hAacEncoder->nSamplesRead));
     INT_PCM *pIn =
         hAacEncoder->inputBuffer +
-        hAacEncoder->inputBufferOffset / hAacEncoder->aacConfig.nChannels +
-        hAacEncoder->nSamplesRead / hAacEncoder->extParam.nChannels;
+        (hAacEncoder->inputBufferOffset + hAacEncoder->nSamplesRead) /
+            hAacEncoder->aacConfig.nChannels;
     newSamples -=
         (newSamples %
          hAacEncoder->extParam
@@ -1827,13 +1820,12 @@ AACENC_ERROR aacEncEncode(const HANDLE_AACENCODER hAacEncoder,
 
         /* clear out until end-of-buffer */
         if (nZeros) {
-          INT_PCM *pIn =
-              hAacEncoder->inputBuffer +
-              hAacEncoder->inputBufferOffset /
-                  hAacEncoder->aacConfig.nChannels +
-              hAacEncoder->nSamplesRead / hAacEncoder->extParam.nChannels;
           for (i = 0; i < (int)hAacEncoder->extParam.nChannels; i++) {
-            FDKmemclear(pIn + i * hAacEncoder->inputBufferSizePerChannel,
+            FDKmemclear(hAacEncoder->inputBuffer +
+                            i * hAacEncoder->inputBufferSizePerChannel +
+                            (hAacEncoder->inputBufferOffset +
+                             hAacEncoder->nSamplesRead) /
+                                hAacEncoder->extParam.nChannels,
                         sizeof(INT_PCM) * nZeros);
           }
           hAacEncoder->nZerosAppended += nZeros;
@@ -2520,11 +2512,6 @@ bail:
 AACENC_ERROR aacEncInfo(const HANDLE_AACENCODER hAacEncoder,
                         AACENC_InfoStruct *pInfo) {
   AACENC_ERROR err = AACENC_OK;
-
-  if ((hAacEncoder == NULL) || (pInfo == NULL)) {
-    err = AACENC_INVALID_HANDLE;
-    goto bail;
-  }
 
   FDKmemclear(pInfo, sizeof(AACENC_InfoStruct));
   pInfo->confSize = 64; /* pre-initialize */
