@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2020 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -1098,28 +1098,6 @@ static void SpatialDecApplyBypass(spatialDec *self, FIXP_DBL **hybInputReal,
   }
 }
 
-/**
- * \brief Set internal error and reset error status
- *
- * \param self         spatialDec handle.
- * \param bypassMode   pointer to bypassMode.
- * \param err          error status.
- *
- * \return  error status.
- */
-static SACDEC_ERROR SpatialDecSetInternalError(spatialDec *self,
-                                               int *bypassMode,
-                                               SACDEC_ERROR err) {
-  *bypassMode = 1;
-
-  if (self->errInt == MPS_OK) {
-    /* store internal error before it gets overwritten */
-    self->errInt = err;
-  }
-
-  return MPS_OK;
-}
-
 /*******************************************************************************
  Functionname: SpatialDecApplyParameterSets
  *******************************************************************************
@@ -1140,7 +1118,7 @@ static SACDEC_ERROR SpatialDecApplyParameterSets(
     const FDK_channelMapDescr *const mapDescr) {
   SACDEC_ERROR err = MPS_OK;
 
-  FIXP_SGL alpha = FL2FXCONST_SGL(0.0);
+  FIXP_SGL alpha;
 
   int ts;
   int ch;
@@ -1163,22 +1141,20 @@ static SACDEC_ERROR SpatialDecApplyParameterSets(
        ts++, ts_io++) {
     int currSlot = frame->paramSlot[ps];
 
-    err = (currSlot < ts) ? MPS_WRONG_PARAMETERSETS : MPS_OK;
-    if (err != MPS_OK) {
-      err = SpatialDecSetInternalError(self, &bypassMode, err);
-    }
-
     /*
      * Get new parameter set
      */
     if (ts == prevSlot + 1) {
-      if (bypassMode == 0) {
-        err = SpatialDecCalculateM1andM2(
-            self, ps, frame); /* input: ottCLD, ottICC, ... */
-                              /* output: M1param(Real/Imag), M2(Real/Imag) */
-        if (err != MPS_OK) {
-          err = SpatialDecSetInternalError(self, &bypassMode, err);
+      err = SpatialDecCalculateM1andM2(self, ps,
+                                       frame); /* input: ottCLD, ottICC, ... */
+      /* output: M1param(Real/Imag), M2(Real/Imag) */
+      if (err != MPS_OK) {
+        bypassMode = 1;
+        if (self->errInt == MPS_OK) {
+          /* store internal error befor it gets overwritten */
+          self->errInt = err;
         }
+        err = MPS_OK;
       }
 
       if ((ps == 0) && (self->bOverwriteM1M2prev != 0)) {
@@ -1192,16 +1168,13 @@ static SACDEC_ERROR SpatialDecApplyParameterSets(
         self->bOverwriteM1M2prev = 0;
       }
 
-      if (bypassMode == 0) {
-        SpatialDecSmoothM1andM2(
-            self, frame,
-            ps); /* input: M1param(Real/Imag)(Prev), M2(Real/Imag)(Prev) */
-      }          /* output: M1param(Real/Imag), M2(Real/Imag) */
+      SpatialDecSmoothM1andM2(
+          self, frame,
+          ps); /* input: M1param(Real/Imag)(Prev), M2(Real/Imag)(Prev) */
+               /* output: M1param(Real/Imag), M2(Real/Imag) */
     }
 
-    if (bypassMode == 0) {
-      alpha = FX_DBL2FX_SGL(fDivNorm(ts - prevSlot, currSlot - prevSlot));
-    }
+    alpha = FX_DBL2FX_SGL(fDivNorm(ts - prevSlot, currSlot - prevSlot));
 
     switch (mode) {
       case INPUTMODE_QMF_SBR:
@@ -1209,17 +1182,15 @@ static SACDEC_ERROR SpatialDecApplyParameterSets(
           self->bShareDelayWithSBR = 0; /* We got no hybrid delay */
         else
           self->bShareDelayWithSBR = 1;
-        SpatialDecFeedQMF(
-            self, qmfInDataReal, qmfInDataImag, ts_io, bypassMode,
-            self->qmfInputReal__FDK, self->qmfInputImag__FDK,
-            (bypassMode) ? numInputChannels : self->numInputChannels);
+        SpatialDecFeedQMF(self, qmfInDataReal, qmfInDataImag, ts_io, bypassMode,
+                          self->qmfInputReal__FDK, self->qmfInputImag__FDK,
+                          self->numInputChannels);
         break;
       case INPUTMODE_TIME:
         self->bShareDelayWithSBR = 0;
-        SpatialDecQMFAnalysis(
-            self, inData, ts_io, bypassMode, self->qmfInputReal__FDK,
-            self->qmfInputImag__FDK,
-            (bypassMode) ? numInputChannels : self->numInputChannels);
+        SpatialDecQMFAnalysis(self, inData, ts_io, bypassMode,
+                              self->qmfInputReal__FDK, self->qmfInputImag__FDK,
+                              self->numInputChannels);
         break;
       default:
         break;
@@ -1389,7 +1360,7 @@ static SACDEC_ERROR SpatialDecApplyParameterSets(
       }   /* !self->tempShapeConfig == 1 */
     }     /*  !bypassMode */
 
-    if ((self->phaseCoding == 1) && (bypassMode == 0)) {
+    if (self->phaseCoding == 1) {
       /* only if bsPhaseCoding == 1 and bsResidualCoding == 0 */
 
       SpatialDecApplyPhase(
