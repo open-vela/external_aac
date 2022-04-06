@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2021 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2019 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -229,13 +229,15 @@ inline void combineSignalCplxScale1(FIXP_DBL *hybOutputRealDry,
   int n;
   FIXP_DBL scaleY;
   for (n = bands - 1; n >= 0; n--) {
-    scaleY = fMult(scaleX, *pBP);
+    scaleY = fMultDiv2(scaleX, *pBP);
     *hybOutputRealDry = SATURATE_LEFT_SHIFT(
-        (*hybOutputRealDry >> SF_SCALE) + fMult(*hybOutputRealWet, scaleY),
-        SF_SCALE, DFRACT_BITS);
+        (*hybOutputRealDry >> 1) +
+            (fMultDiv2(*hybOutputRealWet, scaleY) << (SF_SCALE + 1)),
+        1, DFRACT_BITS);
     *hybOutputImagDry = SATURATE_LEFT_SHIFT(
-        (*hybOutputImagDry >> SF_SCALE) + fMult(*hybOutputImagWet, scaleY),
-        SF_SCALE, DFRACT_BITS);
+        (*hybOutputImagDry >> 1) +
+            (fMultDiv2(*hybOutputImagWet, scaleY) << (SF_SCALE + 1)),
+        1, DFRACT_BITS);
     hybOutputRealDry++, hybOutputRealWet++;
     hybOutputImagDry++, hybOutputImagWet++;
     pBP++;
@@ -250,12 +252,12 @@ inline void combineSignalCplxScale2(FIXP_DBL *hybOutputRealDry,
   int n;
 
   for (n = bands - 1; n >= 0; n--) {
-    *hybOutputRealDry = SATURATE_LEFT_SHIFT(
-        (*hybOutputRealDry >> SF_SCALE) + fMult(*hybOutputRealWet, scaleX),
-        SF_SCALE, DFRACT_BITS);
-    *hybOutputImagDry = SATURATE_LEFT_SHIFT(
-        (*hybOutputImagDry >> SF_SCALE) + fMult(*hybOutputImagWet, scaleX),
-        SF_SCALE, DFRACT_BITS);
+    *hybOutputRealDry =
+        *hybOutputRealDry +
+        (fMultDiv2(*hybOutputRealWet, scaleX) << (SF_SCALE + 1));
+    *hybOutputImagDry =
+        *hybOutputImagDry +
+        (fMultDiv2(*hybOutputImagWet, scaleX) << (SF_SCALE + 1));
     hybOutputRealDry++, hybOutputRealWet++;
     hybOutputImagDry++, hybOutputImagWet++;
   }
@@ -367,15 +369,15 @@ SACDEC_ERROR subbandTPApply(spatialDec *self, const SPATIAL_BS_FRAME *frame) {
     hStpDec->update_old_ener = 1;
     for (ch = 0; ch < self->numInputChannels; ch++) {
       hStpDec->oldDryEnerLD64[ch] =
-          CalcLdData(fAddSaturate(hStpDec->runDryEner[ch], ABS_THR__FDK));
+          CalcLdData(hStpDec->runDryEner[ch] + ABS_THR__FDK);
     }
     for (ch = 0; ch < self->numOutputChannels; ch++) {
       if (self->treeConfig == TREE_212)
         hStpDec->oldWetEnerLD64[ch] =
-            CalcLdData(fAddSaturate(hStpDec->runWetEner[ch], ABS_THR__FDK));
+            CalcLdData(hStpDec->runWetEner[ch] + ABS_THR__FDK);
       else
         hStpDec->oldWetEnerLD64[ch] =
-            CalcLdData(fAddSaturate(hStpDec->runWetEner[ch], ABS_THR2__FDK));
+            CalcLdData(hStpDec->runWetEner[ch] + ABS_THR2__FDK);
     }
   } else {
     hStpDec->update_old_ener++;
