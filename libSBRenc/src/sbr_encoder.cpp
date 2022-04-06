@@ -1,7 +1,7 @@
 /* -----------------------------------------------------------------------------
 Software License for The Fraunhofer FDK AAC Codec Library for Android
 
-© Copyright  1995 - 2020 Fraunhofer-Gesellschaft zur Förderung der angewandten
+© Copyright  1995 - 2018 Fraunhofer-Gesellschaft zur Förderung der angewandten
 Forschung e.V. All rights reserved.
 
  1.    INTRODUCTION
@@ -1450,6 +1450,8 @@ static INT initEnvChannel(HANDLE_SBR_CONFIG_DATA sbrConfigData,
                                     params->deltaTAcrossFrames, 0, 0))
     return (1);
 
+  sbrConfigData->initAmpResFF = params->init_amp_res_FF;
+
   if (FDKsbrEnc_InitSbrHuffmanTables(&hEnv->encEnvData, &hEnv->sbrCodeEnvelope,
                                      &hEnv->sbrCodeNoiseFloor,
                                      sbrHeaderData->sbr_amp_res))
@@ -1747,7 +1749,6 @@ static INT FDKsbrEnc_EnvInit(HANDLE_SBR_ELEMENT hSbrElement,
     hSbrElement->sbrHeaderData.sbr_data_extra = 1;
 
   hSbrElement->sbrHeaderData.sbr_amp_res = (AMP_RES)params->amp_res;
-  hSbrElement->sbrConfigData.initAmpResFF = params->init_amp_res_FF;
 
   /* header_extra_1 */
   hSbrElement->sbrHeaderData.freqScale = params->freqScale;
@@ -2559,7 +2560,7 @@ INT sbrEncoder_GetLibInfo(LIB_INFO *info) {
   info->version =
       LIB_VERSION(SBRENCODER_LIB_VL0, SBRENCODER_LIB_VL1, SBRENCODER_LIB_VL2);
   LIB_VERSION_STRING(info);
-#ifdef SUPPRESS_BUILD_DATE_INFO
+#ifdef __ANDROID__
   info->build_date = "";
   info->build_time = "";
 #else
