@@ -432,6 +432,20 @@ Where N equals to CStreamInfo::frameSize .
 #include "FDK_audio.h"
 
 #include "genericStds.h"
+
+/* Decoder library info */
+#define AACDECODER_LIB_VL0 3
+#define AACDECODER_LIB_VL1 2
+#define AACDECODER_LIB_VL2 0
+#define AACDECODER_LIB_TITLE "AAC Decoder Lib"
+#ifdef SUPPRESS_BUILD_DATE_INFO
+#define AACDECODER_LIB_BUILD_DATE ""
+#define AACDECODER_LIB_BUILD_TIME ""
+#else
+#define AACDECODER_LIB_BUILD_DATE __DATE__
+#define AACDECODER_LIB_BUILD_TIME __TIME__
+#endif
+
 /**
  * \brief  AAC decoder error codes.
  */
