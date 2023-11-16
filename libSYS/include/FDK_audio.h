@@ -732,7 +732,7 @@ typedef struct LIB_INFO {
 #endif
 
 /** Initialize library info. */
-static FDK_AUDIO_INLINE void FDKinitLibInfo(LIB_INFO* info) {
+static __attribute__((unused)) FDK_AUDIO_INLINE void FDKinitLibInfo(LIB_INFO* info) {
   int i;
 
   for (i = 0; i < FDK_MODULE_LAST; i++) {
@@ -741,7 +741,7 @@ static FDK_AUDIO_INLINE void FDKinitLibInfo(LIB_INFO* info) {
 }
 
 /** Aquire supported features of library. */
-static FDK_AUDIO_INLINE UINT
+static __attribute__((unused)) FDK_AUDIO_INLINE UINT
 FDKlibInfo_getCapabilities(const LIB_INFO* info, FDK_MODULE_ID module_id) {
   int i;
 
@@ -754,7 +754,7 @@ FDKlibInfo_getCapabilities(const LIB_INFO* info, FDK_MODULE_ID module_id) {
 }
 
 /** Search for next free tab. */
-static FDK_AUDIO_INLINE INT FDKlibInfo_lookup(const LIB_INFO* info,
+static __attribute__((unused)) FDK_AUDIO_INLINE INT FDKlibInfo_lookup(const LIB_INFO* info,
                                               FDK_MODULE_ID module_id) {
   int i = -1;
 
