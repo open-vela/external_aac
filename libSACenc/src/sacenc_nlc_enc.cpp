@@ -959,14 +959,14 @@ INT fdk_sacenc_ecDataPairEnc(HANDLE_FDK_BITSTREAM strm,
   SHORT num_lsb_bits = -1;
   SHORT num_pcm_bits = -1;
 
-  SHORT quant_data_lsb[2][MAXBANDS];
-  SHORT quant_data_msb[2][MAXBANDS];
+  SHORT quant_data_lsb[2][MAXBANDS] = { -1 };
+  SHORT quant_data_msb[2][MAXBANDS] = { -1 };
 
-  SHORT quant_data_hist_lsb[MAXBANDS];
-  SHORT quant_data_hist_msb[MAXBANDS];
+  SHORT quant_data_hist_lsb[MAXBANDS] = { -1 };
+  SHORT quant_data_hist_msb[MAXBANDS] = { -1 };
 
-  SHORT data_diff_freq[2][MAXBANDS];
-  SHORT data_diff_time[2][MAXBANDS + 2];
+  SHORT data_diff_freq[2][MAXBANDS] = { -1 };
+  SHORT data_diff_time[2][MAXBANDS + 2] = { -1 };
 
   SHORT *p_quant_data_msb[2];
   SHORT *p_quant_data_hist_msb = NULL;
@@ -1254,14 +1254,14 @@ INT fdk_sacenc_ecDataSingleEnc(HANDLE_FDK_BITSTREAM strm,
   SHORT num_lsb_bits = -1;
   SHORT num_pcm_bits = -1;
 
-  SHORT quant_data_lsb[MAXBANDS];
-  SHORT quant_data_msb[MAXBANDS];
+  SHORT quant_data_lsb[MAXBANDS] = { -1 };
+  SHORT quant_data_msb[MAXBANDS] = { -1 };
 
-  SHORT quant_data_hist_lsb[MAXBANDS];
-  SHORT quant_data_hist_msb[MAXBANDS];
+  SHORT quant_data_hist_lsb[MAXBANDS] = { -1 };
+  SHORT quant_data_hist_msb[MAXBANDS] = { -1 };
 
-  SHORT data_diff_freq[MAXBANDS];
-  SHORT data_diff_time[MAXBANDS + 2];
+  SHORT data_diff_freq[MAXBANDS] = { -1 };
+  SHORT data_diff_time[MAXBANDS + 2] = { -1 };
 
   SHORT *p_quant_data_msb;
   SHORT *p_quant_data_hist_msb = NULL;
