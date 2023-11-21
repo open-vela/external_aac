@@ -160,7 +160,7 @@ typedef enum {
 #define HUFFDEC_PARMS
 
 #define MAX_ENTRIES 168
-#define HANDLE_HUFF_NODE const SHORT(*)[MAX_ENTRIES][2]
+#define HANDLE_HUFF_NODE const SHORT(*)[][2]
 
 #endif /* HUFFDECPARAMS */
 

@@ -227,7 +227,7 @@ static ERROR_t pcm_decode(HANDLE_FDK_BITSTREAM strm, SCHAR* out_data_1,
 }
 
 static ERROR_t huff_read(HANDLE_FDK_BITSTREAM strm,
-                         const SHORT (*nodeTab)[MAX_ENTRIES][2],
+                         const SHORT (*nodeTab)[][2],
                          int* out_data) {
   int node = 0;
   int len = 0;
@@ -245,7 +245,7 @@ static ERROR_t huff_read(HANDLE_FDK_BITSTREAM strm,
 }
 
 static ERROR_t huff_read_2D(HANDLE_FDK_BITSTREAM strm,
-                            const SHORT (*nodeTab)[MAX_ENTRIES][2],
+                            const SHORT (*nodeTab)[][2],
                             SCHAR out_data[2], int* escape) {
   ERROR_t err = HUFFDEC_OK;
 
@@ -316,8 +316,8 @@ static ERROR_t huff_dec_1D(HANDLE_FDK_BITSTREAM strm, const DATA_TYPE data_type,
   ULONG data = 0;
   int bitsAvail = 0;
 
-  const SHORT(*partTab)[MAX_ENTRIES][2] = NULL;
-  const SHORT(*nodeTab)[MAX_ENTRIES][2] = NULL;
+  const SHORT(*partTab)[][2] = NULL;
+  const SHORT(*nodeTab)[][2] = NULL;
 
   switch (data_type) {
     case t_CLD:
@@ -396,7 +396,7 @@ static ERROR_t huff_dec_2D(HANDLE_FDK_BITSTREAM strm, const DATA_TYPE data_type,
 
   SCHAR esc_data[2][28] = {{0}};
   int escIdx[28] = {0};
-  const SHORT(*nodeTab)[MAX_ENTRIES][2] = NULL;
+  const SHORT(*nodeTab)[][2] = NULL;
 
   /* LAV */
   if ((err =
