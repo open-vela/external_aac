@@ -999,7 +999,7 @@ FDK_PSENC_ERROR FDKsbrEnc_PSEncode(
 
     /* IPD OPD not supported right now */
     FDKmemclear(hPsOut->ipd,
-                PS_MAX_ENVELOPES * PS_MAX_BANDS * sizeof(PS_DELTA));
+                static_cast<int>(PS_MAX_ENVELOPES) * static_cast<int>(PS_MAX_BANDS) * sizeof(PS_DELTA));
     for (env = 0; env < PS_MAX_ENVELOPES; env++) {
       hPsOut->deltaIPD[env] = PS_DELTA_FREQ;
       hPsOut->deltaOPD[env] = PS_DELTA_FREQ;
