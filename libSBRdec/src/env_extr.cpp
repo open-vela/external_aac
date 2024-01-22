@@ -1173,7 +1173,10 @@ static int generateFixFixOnly(FRAME_INFO *hSbrFrameInfo, int tranPosInternal,
   /* look number of envelopes in table */
   nEnv = pTable[0];
   /* look up envelope distribution in table */
-  for (i = 1; i < nEnv; i++) hSbrFrameInfo->borders[i] = pTable[i + 2];
+  for (i = 1; i < nEnv; i++) {
+    if (i < MAX_ENVELOPES + 1)
+      hSbrFrameInfo->borders[i] = pTable[i + 2];
+  }
   /* open and close frame border */
   hSbrFrameInfo->borders[0] = 0;
   hSbrFrameInfo->borders[nEnv] = numberTimeSlots;
