@@ -184,6 +184,7 @@ static inline int isTwoChMode(UPMIXTYPE upmixType) {
 
 #define MPEGS_BYPASSMODE (0x00000001)
 #define MPEGS_CONCEAL (0x00000002)
+#define LOSSLESSDATA LOSSLESSDATA_DEC
 
 typedef struct STP_DEC *HANDLE_STP_DEC;
 

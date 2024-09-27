@@ -111,6 +111,8 @@ amm-info@iis.fraunhofer.de
 #include "cmondata.h"
 #include "fram_gen.h"
 
+#define SBR_HEADER_DATA SBR_HEADER_DATA_ENC
+
 struct SBR_ENV_DATA;
 
 struct SBR_BITSTREAM_DATA {

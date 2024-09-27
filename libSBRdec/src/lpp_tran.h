@@ -160,6 +160,7 @@ amm-info@iis.fraunhofer.de
 
 #define MAX_NUM_PATCHES 6
 #define SHIFT_START_SB 1 /*!< lowest subband of source range */
+#define PATCH_PARAM PATCH_PARAM_DEC
 
 typedef enum {
   INVF_OFF = 0,

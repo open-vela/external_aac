@@ -107,6 +107,8 @@ amm-info@iis.fraunhofer.de
 
 #include "FDK_crc.h"
 
+#define STRUCT_ADTS STRUCT_ADTS_ENC
+
 typedef struct {
   INT sample_freq;
   CHANNEL_MODE channel_mode;

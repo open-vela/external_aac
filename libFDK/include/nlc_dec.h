@@ -107,6 +107,8 @@ amm-info@iis.fraunhofer.de
 #include "huff_nodes.h"
 #include "common_fix.h"
 
+#define DATA_TYPE DATA_TYPE_DEC
+
 typedef enum {
 
   SAC_DECODER,

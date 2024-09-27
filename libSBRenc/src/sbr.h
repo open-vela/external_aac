@@ -122,6 +122,7 @@ amm-info@iis.fraunhofer.de
 
 /* SBR bitstream delay */
 #define MAX_DELAY_FRAMES 2
+#define SBR_CHANNEL SBR_CHANNEL_ENC
 
 /* sbr encoder downsampling type */
 typedef enum { SBRENC_DS_NONE, SBRENC_DS_TIME, SBRENC_DS_QMF } SBRENC_DS_TYPE;

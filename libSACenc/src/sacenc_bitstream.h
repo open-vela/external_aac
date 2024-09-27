@@ -115,6 +115,7 @@ amm-info@iis.fraunhofer.de
 #define MAX_NUM_PARAMS 2
 #define MAX_NUM_OUTPUTCHANNELS SACENC_MAX_OUTPUT_CHANNELS
 #define MAX_TIME_SLOTS 32
+#define LOSSLESSDATA LOSSLESSDATA_ENC
 
 typedef enum {
   TREE_212 = 7,

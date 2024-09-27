@@ -110,6 +110,7 @@ amm-info@iis.fraunhofer.de
 #define MIN_LATM_HEADERLENGTH 9
 #define MIN_LOAS_HEADERLENGTH MIN_LATM_HEADERLENGTH + 24 /* both in bits */
 #define MIN_TP_BUF_SIZE_LOAS (8194)
+#define LATM_LAYER_INFO LATM_LAYER_INFO_DEC
 
 enum {
   LATM_MAX_PROG = 1,
