@@ -166,6 +166,8 @@ typedef struct {
 
 typedef SBR_DEC *HANDLE_SBR_DEC;
 
+#define SBR_CHANNEL SBR_CHANNEL_DEC
+
 typedef struct {
   SBR_FRAME_DATA frameData[(1) + 1];
   SBR_PREV_FRAME_DATA prevFrameData;

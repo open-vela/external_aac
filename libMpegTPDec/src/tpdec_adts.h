@@ -117,6 +117,8 @@ amm-info@iis.fraunhofer.de
 #define ADTS_MIN_TP_BUF_SIZE (8191)
 #endif
 
+#define STRUCT_ADTS STRUCT_ADTS_DEC
+
 #include "FDK_crc.h"
 
 typedef struct {
