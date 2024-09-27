@@ -114,6 +114,7 @@ amm-info@iis.fraunhofer.de
 
 #define MAX_NUM_PATCHES 6
 #define SCALE_NRGVEC 4
+#define PATCH_PARAM PATCH_PARAM_ENC
 
 /** parameter set for one single patch */
 typedef struct {

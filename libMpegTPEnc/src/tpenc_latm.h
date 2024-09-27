@@ -120,6 +120,8 @@ amm-info@iis.fraunhofer.de
   2 /* set this carefully to avoid buffer overflows \
      */
 
+#define LATM_LAYER_INFO LATM_LAYER_INFO_ENC
+
 typedef enum { LATMVAR_SIMPLE_SEQUENCE } LATM_VAR_MODE;
 
 typedef struct {

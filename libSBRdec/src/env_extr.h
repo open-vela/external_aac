@@ -238,6 +238,7 @@ typedef FREQ_BAND_DATA *HANDLE_FREQ_BAND_DATA;
 
 #define SBRDEC_HDR_STAT_RESET 1
 #define SBRDEC_HDR_STAT_UPDATE 2
+#define SBR_HEADER_DATA SBR_HEADER_DATA_DEC
 
 typedef struct {
   UCHAR ampResolution; /*!< Amplitude resolution of envelope values (0: 1.5dB,

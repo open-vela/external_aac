@@ -111,6 +111,7 @@ amm-info@iis.fraunhofer.de
 
 /* Defines *******************************************************************/
 #define MAXBANDS MAX_NUM_BINS /* maximum number of frequency bands */
+#define DATA_TYPE DATA_TYPE_ENC
 
 /* Data Types ****************************************************************/
 typedef enum {
