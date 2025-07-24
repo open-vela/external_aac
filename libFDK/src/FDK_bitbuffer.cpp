@@ -246,7 +246,7 @@ INT FDK_getBwd(HANDLE_FDK_BITBUF hBitBuf, const UINT numberOfBits) {
 }
 
 void FDK_put(HANDLE_FDK_BITBUF hBitBuf, UINT value, const UINT numberOfBits) {
-  if (numberOfBits != 0) {
+  if (numberOfBits != 0 && numberOfBits <= 32) {
     UINT byteOffset0 = hBitBuf->BitNdx >> 3;
     UINT bitOffset = hBitBuf->BitNdx & 0x7;
 
